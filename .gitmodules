@@ -1,0 +1,9 @@
+[submodule "components/epaper-spi/calepd"]
+	path = components/epaper-spi/calepd
+	url = https://github.com/martinberlin/CalEPD.git
+[submodule "components/adafruit-gfx"]
+	path = components/adafruit-gfx
+	url = https://github.com/martinberlin/Adafruit-GFX-Library-ESP-IDF
+[submodule "components/rtc/ds3231"]
+	path = components/rtc/ds3231
+	url = https://github.com/martinberlin/cpp-ds3231.git
