@@ -4,6 +4,9 @@
 [submodule "components/adafruit-gfx"]
 	path = components/adafruit-gfx
 	url = https://github.com/martinberlin/Adafruit-GFX-Library-ESP-IDF
-[submodule "components/rtc/ds3231"]
-	path = components/rtc/ds3231
+[submodule "components/i2c/ds3231"]
+	path = components/i2c/ds3231
 	url = https://github.com/martinberlin/cpp-ds3231.git
+[submodule "components/i2c/ft6x36"]
+	path = components/i2c/ft6x36
+	url = https://github.com/martinberlin/FT6X36-IDF.git

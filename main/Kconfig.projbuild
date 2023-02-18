@@ -1,0 +1,71 @@
+menu "RTC & I2C Configuration"
+
+    config SCL_GPIO
+        int "SCL GPIO number"
+        range 0 34
+        default 15
+        help
+            GPIO number (IOxx) for I2C Clock.
+            Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used to CS.
+            GPIOs 35-39 are input-only so cannot be used as outputs.
+
+    config SDA_GPIO
+        int "SDA GPIO number"
+        range 0 34
+        default 7
+        help
+            GPIO number (IOxx) to I2C SDA.
+            Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used to DC.
+            GPIOs 35-39 are input-only so cannot be used as outputs.
+
+    config TIMEZONE
+        int "Your TimeZone"
+        range -23 23
+        default 2
+        help
+            Your local timezone.
+            When it is 0, Greenwich Mean Time.
+
+    choice MODE
+        prompt "Access Mode"
+        default SET_CLOCK
+        help
+            Select mode for the example.
+        config SET_CLOCK
+            bool "Set RTC Clock"
+            help
+                Set clock for RTC & Get clock from RTC.
+        config GET_CLOCK
+            bool "Only Get Clock"
+            help
+                Get clock from RTC.
+        config DIFF_CLOCK
+            bool "Get the time difference"
+            help
+                Get the time difference of NTP and RTC.
+    endchoice
+
+if SET_CLOCK || DIFF_CLOCK
+    config NTP_SERVER
+        string "NTP Server"
+        default "pool.ntp.org"
+        help
+            Hostname for NTP Server.
+endif
+
+endmenu
+
+menu "BLE GATT SERVER config"
+
+    config SET_RAW_ADV_DATA
+        bool "Use raw data for BLE advertising packets and scan response data"
+        help
+            If this config item is set, raw binary data will be used to generate advertising & scan response data.
+            This option uses the esp_ble_gap_config_adv_data_raw() and esp_ble_gap_config_scan_rsp_data_raw()
+            functions.
+
+            If this config item is unset, advertising & scan response data is provided via a higher-level
+            esp_ble_adv_data_t structure. The lower layer will generate the BLE packets. This option has higher
+            overhead at runtime.
+
+endmenu
