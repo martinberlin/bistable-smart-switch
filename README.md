@@ -25,8 +25,10 @@ It consists in two PCBs and the display using C3 as Microcontroller:
 3. **The 2.7" display** with touch [GDEY027T91-T](https://github.com/martinberlin/cale-idf/wiki/Good-Display-gdey027T91)
 
 ![C3 controller](https://user-images.githubusercontent.com/2692928/218306248-25cc7c8f-0f09-4286-9bbc-a478964cdd3d.png)
+  
+![54x54mm AC-3.3 DC PCBview](Hardware/220AC-mini-C3-board/3D/img/PCB-top-view.png)
 
-![54x54mm AC-3.3 DC with Latch relay](Hardware/220AC-mini-C3-board/3D/PCB-top-view.png)
+![54x54mm AC-3.3 DC with Latch relay](Hardware/220AC-mini-C3-board/3D/img/3d-top.png)
 
 ![2.7 touch FocalTech](https://www.good-display.com/repository/image/106fd348-0392-42a0-bdef-cf9f7e4926bb.jpg)
 
