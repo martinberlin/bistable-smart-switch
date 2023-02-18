@@ -1,10 +1,10 @@
 # Bistable-smart-switch
 
-This is very much a fun project that started with the idea to use small, and inexpensive, SPI epapers with touch that Good-Display produces and it's not easy to sell them.
+This is a project that started with the idea to use small, and inexpensive, SPI epapers with touch. The ones that I've found ávailable are produced by Good-Display in Dalian.
 The idea is very simple: Use this bistable displays, or any others with very low consumption, to design a Switch that can replace a standard European one.
 I know is a lot of technology to turn on the light and at some point I though that no-one will buy a digital switch for a spaceship.
 
-But it turns out that it sparked some interest, no idea why, but there are some interesting points:
+**But it turns out that it sparked some interest since there are some interesting points that drive this:**
 
 - ESP32-C3 is also an unexpensive, single Core, RISC-V Espressif MCU with 4 MB flash and the usual BLE/ WiFi combination
 - Having touch and UX, using our own component CalEPD and our own touch fork, gives us the freedom to be Code-light and make versatile examples that everyone can extend and collaborate (Oh my god, don't make me configure GxEPD as much as I respect that library)
@@ -13,13 +13,15 @@ But it turns out that it sparked some interest, no idea why, but there are some 
 All that we have already but it was around different repositories, where you had to configure CMakeFiles to point it to the right example and more...
 The goal of this is to put all this Switch ideas and code demos in a single place, make a WiKi with some configuration tutorials, and make it easy for the user.
 
+With the current hardware and demo examples what you can do is straight-forward. You can design a switch, since we provide a very basic example, and detect touch X & Y events. Based on that you can send signals to the Latch relay PCB and move the switch to the ON or OFF position.
+The latch relay has no way to tell in what position is from outside but we know it since by default the ESP32 C3 moves it to OFF as the Firmware starts.
 
 ## The hardware
 
 It consists in two PCBs:
 
-1. ESP32-C3 controller with touch
-2. 220AC to 3.3DC adapter with a Latch relay. 54x54 mm so it fits in the small black box inside the wall Can be also a solid-state relay or you can design your own
+1. **ESP32-C3 controller with touch**
+2. **220AC to 3.3DC adapter with a Latch relay**. 54x54 mm so it fits in the small black box inside the wall Can be also a solid-state relay or you can design your own
 
 ![C3 controller](https://user-images.githubusercontent.com/2692928/218306248-25cc7c8f-0f09-4286-9bbc-a478964cdd3d.png)
 
