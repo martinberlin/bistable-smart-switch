@@ -18,17 +18,18 @@ The latch relay has no way to tell in what position is from outside but we know 
 
 ## The hardware
 
-It consists in two PCBs:
+It consists in two PCBs and the display using C3 as Microcontroller:
 
 1. **ESP32-C3 controller with touch**
-2. **220AC to 3.3DC adapter with a Latch relay**. 54x54 mm so it fits in the small black box inside the wall Can be also a solid-state relay or you can design your own
-3. The display with touch [GDEY027T91-T](https://github.com/martinberlin/cale-idf/wiki/Good-Display-gdey027T91)
+2. **220AC to 3.3DC adapter with a Latch relay switch**. 54x54 mm so it fits in the small black box inside the wall Can be also a solid-state relay or you can design your own
+3. **The 2.7" display** with touch [GDEY027T91-T](https://github.com/martinberlin/cale-idf/wiki/Good-Display-gdey027T91)
 
 ![C3 controller](https://user-images.githubusercontent.com/2692928/218306248-25cc7c8f-0f09-4286-9bbc-a478964cdd3d.png)
 
-![STL 3D](https://github.com/martinberlin/H-spi-adapters/blob/master/220AC-mini-C3-board/schematics/220ac-mini-c3-board.stl)
+![3D of 54x54mm AC-3.3 DC with Latch relay](https://github.com/martinberlin/H-spi-adapters/blob/master/220AC-mini-C3-board/schematics/220ac-mini-c3-board.stl)
 
 ![2.7 touch FocalTech](https://www.good-display.com/repository/image/106fd348-0392-42a0-bdef-cf9f7e4926bb.jpg)
+
 This is the touch panel that comes already on top of the display. Check the [GOODISPLAY product page](https://www.good-display.com/product/2.7-inch-touch-screen,-for-2.7-inch-e-paper-display-259.html) for specifications and datasheet.
 
 Will add more actual pictures in the WiKi section soon, that I like more to keep things organized and inter-linked than a single readme page.
