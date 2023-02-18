@@ -1,0 +1,4 @@
+(sym_lib_table
+  (lib (name "PBO")(type "KiCad")(uri "${KIPRJMOD}/parts/PBO-3C.kicad_sym")(options "")(descr ""))
+  (lib (name "Latch-relay")(type "KiCad")(uri "${KIPRJMOD}/parts/Latch-relay.kicad_sym")(options "")(descr ""))
+)

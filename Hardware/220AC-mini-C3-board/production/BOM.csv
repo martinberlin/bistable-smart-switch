@@ -1,0 +1,15 @@
+"Id";"Designator";"Package";"Quantity";"Designation";"Supplier and ref";
+1;"J1";"1729128-screw-terminal";1;"AC MAINS POWER";;;
+2;"R1";"SMW212RJT";1;"R";;;
+3;"C1,C11";"CP_Elec_10x14.3";2;"12uF";;;
+4;"K1";"HF163FL24HL2T";1;"HF163-F";;;
+5;"D2,D1";"D_SOD-323";2;"1N4148";;;
+6;"CY1";"CC1808KKX7RCBB102";1;"1nF";;;
+7;"U1";"PBO-3C-3";1;"PBO-3C-3";;;
+8;"Q1,Q2";"BC547B";2;"Q_NPN_CBE";;;
+9;"C2";"CP_Radial_D10.0mm_P5.00mm";1;"470uF";;;
+10;"F1";"0443001.DR";1;"Fuse";;;
+11;"J2";"1729128-screw-terminal";1;"ON/OFF switch";;;
+12;"C3";"CP_Elec_10x10";1;"C 150uF";;;
+13;"L1";"SMDRI127-470MT";1;"L";;;
+14;"J3";"PinSocket_1x04_P2.54mm_Vertical";1;"Conn_01x04";;;
