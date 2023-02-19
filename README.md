@@ -4,6 +4,14 @@ This is a project that started with the idea to use small, and inexpensive, SPI 
 The idea is very simple: Use this bistable displays, or any others with very low consumption, to design a Switch that can replace a standard European one.
 I know is a lot of technology to turn on the light and at some point I though that no-one will buy a digital switch for a spaceship.
 
+**IMPORTANT:** This repository contains components added as github submodules. Please clone it using
+
+    git clone --recurse-submodules https://github.com/martinberlin/bistable-smart-switch.git
+
+    or if you already cloned it without them just run additionally:
+
+    git submodule update --init --recursive
+
 **But it turns out that it sparked some interest since there are some interesting points that drive this:**
 
 - **ESP32-C3** is also an unexpensive, single Core, RISC-V Espressif MCU with 4 MB flash and the usual BLE/ WiFi combination
@@ -37,11 +45,28 @@ This is the touch panel that comes already on top of the display. Check the [GOO
 
 More pictures and documentation will be added in the WiKi section, that is better to keep things organized and inter-linked than a single readme page.
 
+## IO configuration
+
+We will keep mostly the same "proven to work" IOs along the PCB versions but it might be that routing is simpler using different pins for SPI. To keep it organized the default sdkconfig will point to PCB latest release (In this case 1.1) and we will keep track of the right IO config for different versions in the [sdk-config-board](sdk-config-board) directory.
+
+As an example if you have a 1.0 PCB, you can simply cp that sdkconfig to your project one doing this from the project root folder:
+
+    $ cp sdk-config-board/1.0/sdkconfig .
+
+Alternatively you can configure this the usual way with ESP-IDF using menuconfig:
+
+    idf.py menuconfig
+
+    SPI configuration is located in: **Component config → SPI epaper configuration**
+
+    I2C and RTC configuration: **Root → RTC & I2C Configuration**
+
+    WiFi connection for RTC sync: **Root → Example Connection Configuration**
+
 ## The code examples
 
 1. [Getting started](main/switch/getting-started) a simple ON-OFF basic switch. No configuration required.
 
 More will soon land here. For the moment they are in mother repository cale-idf that is an incredible mess where I develop the components and is full of examples, that I promised myself to reorganize, and I will probably never do.
 Just be patient, life takes it's times, just like the hardware design part and examples.
-
 
