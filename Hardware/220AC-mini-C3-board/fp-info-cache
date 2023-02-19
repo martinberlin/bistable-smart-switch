@@ -1,4 +1,4 @@
-8213260635985007
+8214937434453073
 Calibration_Scale
 Gauge_10mm_Type1_CopperTop
 Gauge, Massstab, 10mm, CopperTop, Type 1,
@@ -34360,8 +34360,8 @@ FH44L-1AT-L2-DC3V
 
 
 0
-0
-0
+5
+5
 footprint
 HF163FL24HL2T
 HF163F-L/24-HL2T-2
@@ -34369,6 +34369,13 @@ Relay or Contactor
 0
 5
 5
+footprint
+IND_BRL3225T4R7M
+1210/3225
+Inductor
+0
+2
+2
 footprint
 MountingHole_2.2mm_M2
 Mounting Hole 2.2mm, no annular, M2

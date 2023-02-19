@@ -31,4 +31,9 @@
   (pad "3" thru_hole circle (at -8.72 -3.4) (size 1.8 1.8) (drill 1.2) (layers *.Cu *.Mask) (tstamp bd194087-1db4-4ead-b9dd-47cfc50790ef))
   (pad "4" thru_hole circle (at 8.3 -3.4) (size 1.8 1.8) (drill 1.2) (layers *.Cu *.Mask) (tstamp 167ab89b-207b-4c84-8b4b-6438a6c5dd85))
   (pad "5" thru_hole circle (at 5.95 3.2) (size 1.8 1.8) (drill 1.2) (layers *.Cu *.Mask) (tstamp 038fb6ea-6393-4c14-944c-bfa10242f4f7))
+  (model "${KIPRJMOD}/parts/3d/HF163F-L_24-HL2T.step"
+    (offset (xyz -9 -3.5 0))
+    (scale (xyz 0.8 0.9 0.6))
+    (rotate (xyz 0 0 0))
+  )
 )
