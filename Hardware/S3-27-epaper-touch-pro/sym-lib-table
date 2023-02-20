@@ -1,0 +1,5 @@
+(sym_lib_table
+  (lib (name "ESP32")(type "KiCad")(uri "${KIPRJMOD}/parts/ESP32-C3-Wroom-02-N4.kicad_sym")(options "")(descr ""))
+  (lib (name "CP2102")(type "KiCad")(uri "${KIPRJMOD}/parts/CP2102N-A02-GQFN28R.kicad_sym")(options "")(descr ""))
+  (lib (name "ESP332S3")(type "KiCad")(uri "${KIPRJMOD}/parts/ESP32-S3-WROOM-1-N8.kicad_sym")(options "")(descr ""))
+)
