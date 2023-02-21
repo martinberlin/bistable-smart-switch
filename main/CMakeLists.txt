@@ -6,6 +6,10 @@ message(STATUS "→ Building example for ${target}")
 # 1. Recommended to start with the simplest demo. No WiFi or extra configuration needed: 
 set(app_sources "switch/getting-started/on-off-switch.cpp")
 
+# 2. Check that in I2C addresses comes the Touch ID (Or additionally RTC chip if the PCB has one)
+#    DS3231: 0x68  TOUCH: 0x38
+#set(app_sources "switch/getting-started/i2c-scan.cpp")
+
 set(app_requires
         # I2C peripherals: Touch FT6X36 and RTC
         #                  DS3231 that will be on board C3 controller rel 1.1      
