@@ -71,7 +71,7 @@ void app_main()
             switch (i)
             {
             case 0x38:
-                device = (char *)"FC Touch";
+                device = (char *)"FT6X36 Touch";
                 break;
             case 0x68:
                 device = (char *)"DS3231 RTC";
