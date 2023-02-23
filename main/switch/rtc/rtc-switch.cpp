@@ -1,10 +1,10 @@
 /**
  * This is a demo to be used with Good Display 2.7 touch epaper 
  */ 
-
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "ds3231.h"
 #include "FT6X36.h"
@@ -29,8 +29,12 @@ Gdey027T91 display(io);
 // Relay Latch (high) / OFF
 #define GPIO_RELAY_ON 1
 #define GPIO_RELAY_OFF 3
+
+#define RTC_INT GPIO_NUM_6
 // Pulse to move the switch in millis
 const uint16_t signal_ms = 50;
+xQueueHandle on_min_counter_queue;
+
 // FONT used for title / message body - Only after display library
 //Converting fonts with ümlauts: ./fontconvert *.ttf 18 32 252
 
@@ -43,6 +47,8 @@ struct tm rtcinfo;
 nvs_handle_t storage_handle;
 esp_err_t ds3231_initialization_status = ESP_OK;
 uint8_t display_rotation = 1;
+// Switch always starts OFF when Firmware starts
+bool switch_state = false; // starts false = OFF
 
 // I2C descriptor
 i2c_dev_t dev;
@@ -52,6 +58,30 @@ extern "C"
    void app_main();
 }
 void delay(uint32_t millis) { vTaskDelay(millis / portTICK_PERIOD_MS); }
+
+static void IRAM_ATTR gpio_interrupt_handler(void *args)
+{
+    int pinNumber = (int)args;
+    xQueueSendFromISR(on_min_counter_queue, &pinNumber, NULL);
+}
+
+void on_Task(void *params)
+{
+    int pinNumber, count = 1, on_count = 0;
+  
+    while (true)
+    {
+        if (xQueueReceive(on_min_counter_queue, &pinNumber, portMAX_DELAY))
+        {
+          if (switch_state) {
+            on_count++;
+          }
+          printf("RTC_INT minute alarm ticked: %d mins ON (total:%d times) Switch state: %d\n", on_count, count++, switch_state);
+          ds3231_clear_alarm_flags(&dev, DS3231_ALARM_2);
+        }
+    }
+}
+
 // Some GFX constants
 uint16_t blockWidth = 42;
 uint16_t blockHeight = display.height()/4;
@@ -67,8 +97,6 @@ swap(T& a, T& b)
   a = b;
   b = t;
 }
-
-bool switch_state = false; // starts false = OFF
 
 void draw_centered_text(const GFXfont *font, char * text, int16_t x, int16_t y, uint16_t w, uint16_t h) {
     // Draw external boundary where text needs to be centered in the middle
@@ -126,7 +154,7 @@ void getClock() {
       ESP_LOGE(TAG, "Could not get time.");
       return;
   }
-  ESP_LOGI("CLOCK", "\n%s\n%02d:%02d", weekday_t[rtcinfo.tm_wday], rtcinfo.tm_hour, rtcinfo.tm_min);
+  //ESP_LOGI("CLOCK", "\n%s\n%02d:%02d", weekday_t[rtcinfo.tm_wday], rtcinfo.tm_hour, rtcinfo.tm_min);
 
   // Starting coordinates:
   uint16_t y_start = display.height()/2-40;
@@ -206,7 +234,21 @@ void touchEvent(TPoint p, TEvent e)
 
 void app_main(void)
 {
-   printf("CalEPD version: %s\n", CALEPD_VERSION);
+  printf("CalEPD version: %s\n", CALEPD_VERSION);
+
+  gpio_pullup_en(RTC_INT);
+  gpio_set_direction(RTC_INT, GPIO_MODE_INPUT);
+  ESP_LOGI("RTC INT", "when IO %d is Low", (int)RTC_INT);
+  // Setup interrupt for this IO
+  
+  gpio_set_intr_type(RTC_INT, GPIO_INTR_NEGEDGE);
+  on_min_counter_queue = xQueueCreate(10, sizeof(int));
+  xTaskCreate(on_Task, "on-counter", 2048, NULL, 1, NULL);
+
+  // Is already used by touch!
+  gpio_install_isr_service(0);
+  gpio_isr_handler_add(RTC_INT, gpio_interrupt_handler, (void *)RTC_INT);
+
 
    //Initialize GPIOs direction & initial states
   gpio_set_direction((gpio_num_t)GPIO_RELAY_ON, GPIO_MODE_OUTPUT);
@@ -232,6 +274,10 @@ void app_main(void)
   if (ds3231_initialization_status != ESP_OK) {
       ESP_LOGE(pcTaskGetName(0), "Could not init DS3231 descriptor since touch already did that");
   }
+  // On start clear alarm
+  ds3231_clear_alarm_flags(&dev, DS3231_ALARM_2);
+  delay(100);
+  printf("RTC int state: %d\n\n", gpio_get_level(RTC_INT));
 
   // Test Epd class
   display.init();
@@ -245,6 +291,7 @@ void app_main(void)
   drawUX();
    
   // Instantiate touch. Important pass here the 3 required variables including display width and height
+  printf("Touch will complain that GPIO isr service is already installed (RTC minute counter did it)\n");
    ts.begin(FT6X36_DEFAULT_THRESHOLD, display.width(), display.height());
    ts.setRotation(display.getRotation());
    ts.registerTouchHandler(touchEvent);

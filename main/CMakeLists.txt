@@ -15,6 +15,7 @@ message(STATUS "→ Building example for ${target}")
 #set(app_sources "switch/rtc/set-rtc-clock.cpp")
 set(app_sources "switch/rtc/rtc-switch.cpp")
 
+#set(app_sources "tests/epd-27t91-test.cpp")
 
 set(app_requires
         # I2C peripherals: Touch FT6X36 and RTC
