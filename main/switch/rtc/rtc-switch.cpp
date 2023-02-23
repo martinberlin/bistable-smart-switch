@@ -2,17 +2,17 @@
  * This is a demo to be used with Good Display 2.7 touch epaper 
  */ 
 #include <stdio.h>
+#include <inttypes.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "ds3231.h"
 #include "FT6X36.h"
-// Non-Volatile Storage (NVS) - borrrowed from esp-idf/examples/storage/nvs_rw_value
+// Non-Volatile Storage (NVS)
+#include "esp_system.h"
 #include "nvs_flash.h"
 #include "nvs.h"
-#include <time.h>
-#include <sys/time.h>
 // Translations: select only one
 #include "english.h"
 //#include "gdew027w3.h"
@@ -45,10 +45,16 @@ xQueueHandle on_min_counter_queue;
 static const char *TAG = "DS3231 switch";
 struct tm rtcinfo;
 nvs_handle_t storage_handle;
+// Every minute the current_month count is updated
+int32_t min_l = 0;
+int32_t min_c = 0;
+
 esp_err_t ds3231_initialization_status = ESP_OK;
 uint8_t display_rotation = 1;
 // Switch always starts OFF when Firmware starts
 bool switch_state = false; // starts false = OFF
+
+int switch_on_sec_count = 0;
 
 // I2C descriptor
 i2c_dev_t dev;
@@ -67,37 +73,37 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
 
 void on_Task(void *params)
 {
-    int pinNumber, count = 1, on_count = 0;
+    int pinNumber; // IO with interrupt
   
     while (true)
     {
         if (xQueueReceive(on_min_counter_queue, &pinNumber, portMAX_DELAY))
         {
           if (switch_state) {
-            on_count++;
+            switch_on_sec_count++;
+            if (switch_on_sec_count % 60 == 0) {
+              min_c++;
+              nvs_set_i32(storage_handle, "min_c", min_c);
+              esp_err_t err = nvs_commit(storage_handle);
+              printf((err != ESP_OK) ? "NVS persist failed!\n" : "NVS commit done\n");
+            }
           }
-          printf("RTC_INT alarm: %d secs ON (total:%d times) Switch state: %d\n", on_count, count++, switch_state);
           ds3231_clear_alarm_flags(&dev, DS3231_ALARM_1);
           ds3231_clear_alarm_flags(&dev, DS3231_ALARM_2);
+
+          printf("ON for %d secs | this month:%d mins | Switch %s\n",
+          switch_on_sec_count, (int)min_c, (switch_state)?(char*)"ON":(char*)"OFF");
         }
     }
 }
 
 // Some GFX constants
-uint16_t blockWidth = 42;
 uint16_t blockHeight = display.height()/4;
 uint16_t lineSpacing = 18;
 uint16_t circleColor = EPD_BLACK;
 uint16_t circleRadio = 10;
 uint16_t selectTextColor  = EPD_WHITE;
 uint16_t selectBackground = EPD_BLACK;
-template <typename T> static inline void
-swap(T& a, T& b)
-{
-  T t = a;
-  a = b;
-  b = t;
-}
 
 void draw_centered_text(const GFXfont *font, char * text, int16_t x, int16_t y, uint16_t w, uint16_t h) {
     // Draw external boundary where text needs to be centered in the middle
@@ -166,16 +172,18 @@ void getClock() {
   display.setTextColor(EPD_LIGHTGREY);
  
   display.setCursor(x_cursor, y_start);
-  display.printerf("%.1f °C", temp);
+  display.printerf("%d   °C", (int)temp); //%.1f for float
 
-  display.setTextColor(EPD_DARKGREY);
+  display.setTextColor(EPD_BLACK);
   x_cursor = 10;
   y_start = display.height()-10;
   display.setFont(&Ubuntu_M8pt8b);
   display.setCursor(x_cursor, y_start);
   // Print clock HH:MM (Seconds excluded: rtcinfo.tm_sec)
-  display.printerf("%02d:%02d %s %d/%d", rtcinfo.tm_hour, rtcinfo.tm_min, weekday_t[rtcinfo.tm_wday], rtcinfo.tm_mday, rtcinfo.tm_mon+1);
+  display.printerf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
 
+  display.setCursor(display.width()/2, y_start);
+  display.printerf("%d secs ON", switch_on_sec_count);
   //clockLayout(rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_sec);
 
   /* ESP_LOGI(pcTaskGetName(0), "%04d-%02d-%02d %02d:%02d:%02d, Week day:%d, %.2f °C", 
@@ -237,39 +245,56 @@ void app_main(void)
 {
   printf("CalEPD version: %s\n", CALEPD_VERSION);
 
-  gpio_pullup_en(RTC_INT);
-  gpio_set_direction(RTC_INT, GPIO_MODE_INPUT);
-  ESP_LOGI("RTC INT", "when IO %d is Low", (int)RTC_INT);
-  // Setup interrupt for this IO
-  
-  gpio_set_intr_type(RTC_INT, GPIO_INTR_NEGEDGE);
-  on_min_counter_queue = xQueueCreate(10, sizeof(int));
-  xTaskCreate(on_Task, "on-counter", 2048, NULL, 1, NULL);
-
-  // Is already used by touch!
-  gpio_install_isr_service(0);
-  gpio_isr_handler_add(RTC_INT, gpio_interrupt_handler, (void *)RTC_INT);
-
-
-   //Initialize GPIOs direction & initial states
-  gpio_set_direction((gpio_num_t)GPIO_RELAY_ON, GPIO_MODE_OUTPUT);
-  gpio_set_direction((gpio_num_t)GPIO_RELAY_OFF, GPIO_MODE_OUTPUT);
-  switchState(false); // OFF at the beginning
-  
-   // Initialize NVS
+  // Initialize NVS
   esp_err_t err = nvs_flash_init();
   if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
       // NVS partition was truncated and needs to be erased
       // Retry nvs_flash_init
       ESP_ERROR_CHECK(nvs_flash_erase());
       err = nvs_flash_init();
+  } else {
+    printf("NVS initialized\n");
   }
   ESP_ERROR_CHECK(err);
 
   err = nvs_open("storage", NVS_READWRITE, &storage_handle);
   if (err != ESP_OK) {
       ESP_LOGE(TAG, "Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+  } else {
+    printf("NVS opened\n");
   }
+
+  gpio_pullup_en(RTC_INT);
+  gpio_set_direction(RTC_INT, GPIO_MODE_INPUT);
+  ESP_LOGI("RTC INT", "when IO %d is Low", (int)RTC_INT);
+  // Setup interrupt for this IO that goes low on the interrupt
+  gpio_set_intr_type(RTC_INT, GPIO_INTR_NEGEDGE);
+
+  // Is already used by touch!
+  gpio_install_isr_service(0);
+  gpio_isr_handler_add(RTC_INT, gpio_interrupt_handler, (void *)RTC_INT);
+  on_min_counter_queue = xQueueCreate(10, sizeof(int));
+  xTaskCreate(on_Task, "on-counter", 2048, NULL, 1, NULL);
+
+  //Initialize GPIOs direction & initial states
+  gpio_set_direction((gpio_num_t)GPIO_RELAY_ON, GPIO_MODE_OUTPUT);
+  gpio_set_direction((gpio_num_t)GPIO_RELAY_OFF, GPIO_MODE_OUTPUT);
+  switchState(false); // OFF at the beginning
+  
+  // Read minutes of current month of Non Volatile Storage. Init seconds to date
+  err = nvs_get_i32(storage_handle, "min_c", &min_c);
+  switch (err) {
+            case ESP_OK:
+                printf("OK min_c= % minutes (total current month)" PRIu32 "\n", min_c);
+                break;
+            case ESP_ERR_NVS_NOT_FOUND:
+                printf("The min_c is not initialized yet in NVS\n");
+                break;
+            default :
+                printf("Error (%s) reading!\n", esp_err_to_name(err));
+        }
+  switch_on_sec_count = min_c*60;
+
   // Initialize RTC
   ds3231_initialization_status = ds3231_init_desc(&dev, I2C_NUM_0, (gpio_num_t) CONFIG_SDA_GPIO, (gpio_num_t) CONFIG_SCL_GPIO);
   if (ds3231_initialization_status != ESP_OK) {
@@ -283,7 +308,11 @@ void app_main(void)
 
   // Test Epd class
   display.init();
-  display.setMonoMode(false); // 4 gray
+  /**
+   * @brief Note: 4 gray uses a second buffer. 
+   * Nice thing about disabling is that all what you write in gray will not be visible when you are in mono mode
+   */
+  display.setMonoMode(true); // 4 gray: false
   display.setRotation(display_rotation);
   //display.update();
   display.setFont(&Ubuntu_M8pt8b);
@@ -294,12 +323,11 @@ void app_main(void)
    
   // Instantiate touch. Important pass here the 3 required variables including display width and height
   printf("Touch will complain that GPIO isr service is already installed (RTC seconds counter did it)\n");
-   ts.begin(FT6X36_DEFAULT_THRESHOLD, display.width(), display.height());
-   ts.setRotation(display.getRotation());
-   ts.registerTouchHandler(touchEvent);
-  
-    for (;;) {
-        ts.loop();
-      }
-      
+  ts.begin(FT6X36_DEFAULT_THRESHOLD, display.width(), display.height());
+  ts.setRotation(display.getRotation());
+  ts.registerTouchHandler(touchEvent);
+  while (true) {
+    ts.loop();
+  }
+
 }
