@@ -21,8 +21,8 @@
 // INTGPIO is touch interrupt, goes low when it detects a touch, which coordinates are read by I2C
 FT6X36 ts(CONFIG_TOUCH_INT);
 EpdSpi io;
-//Gdey027T91 display(io);
-Gdey029T94 display(io);
+Gdey027T91 display(io);
+//Gdey029T94 display(io);
 // Only debugging:
 //#define DEBUG_COUNT_TOUCH
 
@@ -36,12 +36,13 @@ const uint16_t signal_ms = 50;
 
 // Fonts are already included in components Fonts directory (Check it's CMakeFiles)
 #include <Ubuntu_M8pt8b.h>
+#include <Ubuntu_M36pt7b.h>
 
 static const char *TAG = "DS3231 switch";
 struct tm rtcinfo;
 nvs_handle_t storage_handle;
 esp_err_t ds3231_initialization_status = ESP_OK;
-uint8_t display_rotation = 0;
+uint8_t display_rotation = 1;
 
 // I2C descriptor
 i2c_dev_t dev;
@@ -72,7 +73,7 @@ bool switch_state = false; // starts false = OFF
 void draw_centered_text(const GFXfont *font, char * text, int16_t x, int16_t y, uint16_t w, uint16_t h) {
     // Draw external boundary where text needs to be centered in the middle
     //printf("drawRect x:%d y:%d w:%d h:%d\n\n", x, y, w, h);
-    display.drawRect(x, y, w, h, EPD_DARKGREY);
+    display.fillRect(x, y, w, h, EPD_WHITE);
 
     display.setFont(font);
     int16_t text_x = 0;
@@ -111,55 +112,57 @@ void switchState(bool state) {
 }
 
 void getClock() {
-    // Get RTC date and time
-    float temp;
-    if (ds3231_get_temp_float(&dev, &temp) != ESP_OK) {
-        ESP_LOGE(TAG, "Could not get temperature.");
-        return;
-    }
-    // Already got it in main() but otherwise could be done here
-    if (ds3231_get_time(&dev, &rtcinfo) != ESP_OK) {
-        ESP_LOGE(TAG, "Could not get time.");
-        return;
-    }
-    ESP_LOGI("CLOCK", "\n%s\n%02d:%02d", weekday_t[rtcinfo.tm_wday], rtcinfo.tm_hour, rtcinfo.tm_min);
+  // Clean display
+  display.fillScreen(EPD_WHITE);
 
-    // Starting coordinates:
-    uint16_t y_start = 40;
-    uint16_t x_cursor = 10;
-    
-    // Print day name and number
-    display.setCursor(x_cursor, y_start);
-    display.printerf("%s %d", weekday_t[rtcinfo.tm_wday], rtcinfo.tm_mday);
+  // Get RTC date and time
+  float temp;
+  if (ds3231_get_temp_float(&dev, &temp) != ESP_OK) {
+      ESP_LOGE(TAG, "Could not get temperature.");
+      return;
+  }
+  // Already got it in main() but otherwise could be done here
+  if (ds3231_get_time(&dev, &rtcinfo) != ESP_OK) {
+      ESP_LOGE(TAG, "Could not get time.");
+      return;
+  }
+  ESP_LOGI("CLOCK", "\n%s\n%02d:%02d", weekday_t[rtcinfo.tm_wday], rtcinfo.tm_hour, rtcinfo.tm_min);
 
-    // Dayname
-    y_start += 24;
-    display.setCursor(x_cursor, y_start);
-    // Print clock HH:MM (Seconds excluded: rtcinfo.tm_sec)
-    display.printerf("%02d:%02d", rtcinfo.tm_hour, rtcinfo.tm_min);
+  // Starting coordinates:
+  uint16_t y_start = display.height()/2-40;
+  uint16_t x_cursor = 21;
+  
+  // Print temperature
+  display.setFont(&Ubuntu_M36pt7b);
+  display.setTextColor(EPD_LIGHTGREY);
+ 
+  display.setCursor(x_cursor, y_start);
+  display.printerf("%.1f °C", temp);
 
-    // Print temperature
-    y_start += 24;
-    display.setCursor(x_cursor, y_start);
-    display.printerf("%.1f °C", temp);
+  display.setTextColor(EPD_DARKGREY);
+  x_cursor = 10;
+  y_start = display.height()-10;
+  display.setFont(&Ubuntu_M8pt8b);
+  display.setCursor(x_cursor, y_start);
+  // Print clock HH:MM (Seconds excluded: rtcinfo.tm_sec)
+  display.printerf("%02d:%02d %s %d/%d", rtcinfo.tm_hour, rtcinfo.tm_min, weekday_t[rtcinfo.tm_wday], rtcinfo.tm_mday, rtcinfo.tm_mon+1);
 
-    //clockLayout(rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_sec);
+  //clockLayout(rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_sec);
 
-    display.update();
-    // Debug more info
-    /* ESP_LOGI(pcTaskGetName(0), "%04d-%02d-%02d %02d:%02d:%02d, Week day:%d, %.2f °C", 
-        rtcinfo.tm_year, rtcinfo.tm_mon + 1,
-        rtcinfo.tm_mday, rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_sec, rtcinfo.tm_wday, temp); */
+  /* ESP_LOGI(pcTaskGetName(0), "%04d-%02d-%02d %02d:%02d:%02d, Week day:%d, %.2f °C", 
+      rtcinfo.tm_year, rtcinfo.tm_mon + 1,
+      rtcinfo.tm_mday, rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_sec, rtcinfo.tm_wday, temp); */
 }
 
 void drawUX(){
+  getClock();
   uint16_t dw = display.width();
   uint16_t dh = display.height();
   uint8_t  sw = 20;
   uint8_t  sh = 50;
   uint8_t  keyw = 16;
-  uint8_t  keyh = 20;
-  display.fillScreen(EPD_WHITE);
+  uint8_t  keyh = 16;
+  display.fillRoundRect(dw/2-sw/2, dh/2-sh/2, sw, sh, 4, EPD_WHITE);
   display.drawRoundRect(dw/2-sw/2, dh/2-sh/2, sw, sh, 4, EPD_BLACK);
 
   // OFF position
@@ -231,17 +234,14 @@ void app_main(void)
   }
 
   // Test Epd class
-  display.init(false);
+  display.init();
+  display.setMonoMode(false); // 4 gray
   display.setRotation(display_rotation);
   //display.update();
   display.setFont(&Ubuntu_M8pt8b);
   display.setTextColor(EPD_BLACK);
 
   // Please find setClock in set-rtc-clock.cpp
-  getClock();
-  // Show the clock as a demo and start with UX
-  delay(4000);
-
   drawUX();
    
   // Instantiate touch. Important pass here the 3 required variables including display width and height
