@@ -144,14 +144,16 @@ void setClock()
     display.println("RTC alarm set to this hour:");
     display.printerf("%02d:%02d", time.tm_hour, time.tm_min);
     ESP_LOGI((char*)"RTC ALARM", "%02d:%02d", time.tm_hour, time.tm_min);
-    ds3231_clear_alarm_flags(&dev, DS3231_ALARM_2);
+    ds3231_clear_alarm_flags(&dev, DS3231_ALARM_1);
     // i2c_dev_t, ds3231_alarm_t alarms, struct tm *time1,ds3231_alarm1_rate_t option1, struct tm *time2, ds3231_alarm2_rate_t option2
     // Set alarm to a certain HR: MIN
     //ds3231_set_alarm(&dev, DS3231_ALARM_2, &time, (ds3231_alarm1_rate_t)0,  &time, DS3231_ALARM2_MATCH_MINHOUR);
 
     // Set an alarm to tick every minute
-    ds3231_set_alarm(&dev, DS3231_ALARM_2, &time, (ds3231_alarm1_rate_t)0,  &time, DS3231_ALARM2_EVERY_MIN);
-    ds3231_enable_alarm_ints(&dev, DS3231_ALARM_2);
+    //ds3231_set_alarm(&dev, DS3231_ALARM_2, &time, (ds3231_alarm1_rate_t)0,  &time, DS3231_ALARM2_EVERY_MIN);
+    //ds3231_enable_alarm_ints(&dev, DS3231_ALARM_2);
+    ds3231_set_alarm(&dev, DS3231_ALARM_1, &time, DS3231_ALARM1_EVERY_SECOND,  &time, DS3231_ALARM2_EVERY_MIN);
+    ds3231_enable_alarm_ints(&dev, DS3231_ALARM_1);
 }
 
 void app_main(void)

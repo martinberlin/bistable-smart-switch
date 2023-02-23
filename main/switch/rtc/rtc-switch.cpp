@@ -76,7 +76,8 @@ void on_Task(void *params)
           if (switch_state) {
             on_count++;
           }
-          printf("RTC_INT minute alarm ticked: %d mins ON (total:%d times) Switch state: %d\n", on_count, count++, switch_state);
+          printf("RTC_INT alarm: %d secs ON (total:%d times) Switch state: %d\n", on_count, count++, switch_state);
+          ds3231_clear_alarm_flags(&dev, DS3231_ALARM_1);
           ds3231_clear_alarm_flags(&dev, DS3231_ALARM_2);
         }
     }
@@ -275,7 +276,8 @@ void app_main(void)
       ESP_LOGE(pcTaskGetName(0), "Could not init DS3231 descriptor since touch already did that");
   }
   // On start clear alarm
-  ds3231_clear_alarm_flags(&dev, DS3231_ALARM_2);
+  ds3231_clear_alarm_flags(&dev, DS3231_ALARM_1);
+  ds3231_clear_alarm_flags(&dev, DS3231_ALARM_2); // 2 needs to be initially cleared too
   delay(100);
   printf("RTC int state: %d\n\n", gpio_get_level(RTC_INT));
 
@@ -291,7 +293,7 @@ void app_main(void)
   drawUX();
    
   // Instantiate touch. Important pass here the 3 required variables including display width and height
-  printf("Touch will complain that GPIO isr service is already installed (RTC minute counter did it)\n");
+  printf("Touch will complain that GPIO isr service is already installed (RTC seconds counter did it)\n");
    ts.begin(FT6X36_DEFAULT_THRESHOLD, display.width(), display.height());
    ts.setRotation(display.getRotation());
    ts.registerTouchHandler(touchEvent);
