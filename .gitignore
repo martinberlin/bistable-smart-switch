@@ -2,3 +2,6 @@
 build
 sdkconfig.old
 *-backups
+# Ignore Gerbers and leave just the ZIP
+Hardware/C3-27-epaper-touch/production/GBR
+*production/GBR/
