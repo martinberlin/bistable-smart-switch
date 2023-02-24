@@ -285,7 +285,7 @@ void app_main(void)
   err = nvs_get_i32(storage_handle, "min_c", &min_c);
   switch (err) {
             case ESP_OK:
-                printf("OK min_c= % minutes (total current month)" PRIu32 "\n", min_c);
+                printf("OK min_c=%ld minutes (total current month)\n", min_c);
                 break;
             case ESP_ERR_NVS_NOT_FOUND:
                 printf("The min_c is not initialized yet in NVS\n");
