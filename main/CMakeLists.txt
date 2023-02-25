@@ -11,7 +11,10 @@ message(STATUS "→ Building example for ${target}")
 #set(app_sources "switch/getting-started/i2c-scan.cpp")
 
 # 3. Add DS3231 RTC to the Firmware
-set(app_sources "switch/rtc/ds3231-switch.cpp")
+#set(app_sources "switch/rtc/ds3231-switch.cpp")
+
+# 4. Add DS3231 RTC to the Firmware
+set(app_sources "switch/rainmaker/cloud-switch.cpp")
 
 # Only set-clock example: 
 #set(app_sources "switch/rtc/set-rtc-clock.cpp")

@@ -50,5 +50,7 @@ idf_component_register(SRCS ${srcs}
                             # I2C includes FT6X36 touch
                              i2c
                              driver esp_timer
+                            # Rainmaker required components
+                             qrcode esp_rainmaker app_wifi
                     INCLUDE_DIRS "calepd/include"
 )

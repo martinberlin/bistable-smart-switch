@@ -20,7 +20,7 @@ Gdey027T91 display(io);
 
 // Relay Latch (high) / OFF
 #define GPIO_RELAY_ON 1
-#define GPIO_RELAY_OFF 3
+#define GPIO_RELAY_OFF 2
 // Pulse to move the switch in millis
 const uint16_t signal_ms = 50;
 // FONT used for title / message body - Only after display library

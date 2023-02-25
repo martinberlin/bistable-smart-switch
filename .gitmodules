@@ -10,3 +10,12 @@
 [submodule "components/i2c/ft6x36"]
 	path = components/i2c/ft6x36
 	url = https://github.com/martinberlin/FT6X36-IDF.git
+[submodule "components/rmaker_common"]
+	path = components/rmaker_common
+	url = https://github.com/espressif/esp-rainmaker-common.git
+[submodule "components/json_parser/upstream"]
+	path = components/json_parser/upstream
+	url = https://github.com/espressif/json_parser.git
+[submodule "components/json_generator/upstream"]
+	path = components/json_generator/upstream
+	url = https://github.com/espressif/json_generator.git

@@ -34,7 +34,7 @@ Gdey027T91 display(io);
 
 // Relay Latch (high) / OFF
 #define GPIO_RELAY_ON 1
-#define GPIO_RELAY_OFF 3
+#define GPIO_RELAY_OFF 2
 
 #define RTC_INT GPIO_NUM_6
 // Pulse to move the switch in millis
