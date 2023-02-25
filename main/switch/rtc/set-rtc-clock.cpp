@@ -44,10 +44,6 @@ extern "C"
    void app_main();
 }
 
-void delay_ms(uint32_t period_ms) {
-    sys_delay_ms(period_ms);
-}
-
 void time_sync_notification_cb(struct timeval *tv)
 {
     ESP_LOGI(TAG, "Notification of a time synchronization event");
@@ -135,7 +131,7 @@ void setClock()
     ESP_LOGI(pcTaskGetName(0), "Set initial date time done");
 
     display.println("Initial date time\nis saved on RTC\n");
-
+    
     display.printerf("%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
 
     display.println("RTC alarm set to tick every second");

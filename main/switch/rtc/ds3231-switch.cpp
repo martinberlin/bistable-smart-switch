@@ -13,6 +13,12 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "nvs.h"
+// Time & WiFi
+#include <time.h>
+#include <sys/time.h>
+#include "esp_wifi.h"
+#include "protocol_examples_common.h"
+#include "esp_sntp.h"
 // Translations: select only one
 #include "english.h"
 //#include "gdew027w3.h"
@@ -40,6 +46,7 @@ xQueueHandle on_min_counter_queue;
 
 // Fonts are already included in components Fonts directory (Check it's CMakeFiles)
 #include <Ubuntu_M8pt8b.h>
+#include <Ubuntu_M16pt8b.h>
 #include <Ubuntu_M36pt7b.h>
 
 static const char *TAG = "DS3231 switch";
@@ -64,6 +71,113 @@ extern "C"
    void app_main();
 }
 void delay(uint32_t millis) { vTaskDelay(millis / portTICK_PERIOD_MS); }
+
+void time_sync_notification_cb(struct timeval *tv)
+{
+    ESP_LOGI(TAG, "Notification of a time synchronization event");
+}
+
+static void initialize_sntp(void)
+{
+    ESP_LOGI(TAG, "Initializing SNTP");
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    ESP_LOGI(TAG, "Your NTP Server is %s", CONFIG_NTP_SERVER);
+    sntp_setservername(0, CONFIG_NTP_SERVER);
+    sntp_set_time_sync_notification_cb(time_sync_notification_cb);
+    sntp_init();
+}
+
+static bool obtain_time(void)
+{
+    ESP_ERROR_CHECK( esp_netif_init() );
+    ESP_ERROR_CHECK( esp_event_loop_create_default() );
+
+    /* This helper function configures Wi-Fi or Ethernet, as selected in menuconfig.
+     * Read "Establishing Wi-Fi or Ethernet Connection" section in
+     * examples/protocols/README.md for more information about this function.
+     */
+    ESP_ERROR_CHECK(example_connect());
+
+    initialize_sntp();
+
+    // wait for time to be set
+    int retry = 0;
+    const int retry_count = 10;
+    while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET && ++retry < retry_count) {
+        ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+    }
+
+    ESP_ERROR_CHECK( example_disconnect() );
+    if (retry == retry_count) return false;
+    return true;
+}
+
+void setClock()
+{
+    // obtain time over NTP
+    ESP_LOGI(pcTaskGetName(0), "Connecting to WiFi and getting time over NTP.");
+    if(!obtain_time()) {
+        ESP_LOGE(pcTaskGetName(0), "Fail to getting time over NTP.");
+        while (1) { vTaskDelay(1); }
+    }
+
+    // update 'now' variable with current time
+    time_t now;
+    struct tm timeinfo;
+    char strftime_buf[64];
+    time(&now);
+    now = now + (CONFIG_TIMEZONE*60*60);
+    localtime_r(&now, &timeinfo);
+    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+    ESP_LOGI(pcTaskGetName(0), "The current date/time is: %s", strftime_buf);
+
+    ESP_LOGD(pcTaskGetName(0), "timeinfo.tm_sec=%d",timeinfo.tm_sec);
+    ESP_LOGD(pcTaskGetName(0), "timeinfo.tm_min=%d",timeinfo.tm_min);
+    ESP_LOGD(pcTaskGetName(0), "timeinfo.tm_hour=%d",timeinfo.tm_hour);
+    ESP_LOGD(pcTaskGetName(0), "timeinfo.tm_wday=%d",timeinfo.tm_wday);
+    ESP_LOGD(pcTaskGetName(0), "timeinfo.tm_mday=%d",timeinfo.tm_mday);
+    ESP_LOGD(pcTaskGetName(0), "timeinfo.tm_mon=%d",timeinfo.tm_mon);
+    ESP_LOGD(pcTaskGetName(0), "timeinfo.tm_year=%d",timeinfo.tm_year);
+
+    printf("Setting tm_wday: %d\n\n", timeinfo.tm_wday);
+
+    struct tm time = {
+        .tm_sec  = timeinfo.tm_sec,
+        .tm_min  = timeinfo.tm_min,
+        .tm_hour = timeinfo.tm_hour,
+        .tm_mday = timeinfo.tm_mday,
+        .tm_mon  = timeinfo.tm_mon,  // 0-based
+        .tm_year = timeinfo.tm_year + 1900,
+        .tm_wday = timeinfo.tm_wday
+    };
+
+    if (ds3231_set_time(&dev, &time) != ESP_OK) {
+        ESP_LOGE(pcTaskGetName(0), "Could not set time.");
+        while (1) { vTaskDelay(1); }
+    }
+    ESP_LOGI(pcTaskGetName(0), "Set initial date time done");
+
+    display.setCursor(10,60);
+    display.print("Initial date time is saved on RTC.");
+    display.setCursor(10,90);
+    display.setFont(&Ubuntu_M16pt8b);
+    display.printerf("%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+
+    display.setFont(&Ubuntu_M8pt8b);
+    display.setCursor(10,110);
+    display.println("RTC alarm set to tick every sec.");
+    ds3231_clear_alarm_flags(&dev, DS3231_ALARM_1);
+    display.update();
+    
+    // Set an alarm to tick every minute
+    //ds3231_set_alarm(&dev, DS3231_ALARM_2, &time, (ds3231_alarm1_rate_t)0,  &time, DS3231_ALARM2_EVERY_MIN);
+    //ds3231_enable_alarm_ints(&dev, DS3231_ALARM_2);
+    // More precise: Every second
+    ds3231_set_alarm(&dev, DS3231_ALARM_1, &time, DS3231_ALARM1_EVERY_SECOND,  &time, DS3231_ALARM2_EVERY_MIN);
+    ds3231_enable_alarm_ints(&dev, DS3231_ALARM_1);
+    
+}
 
 static void IRAM_ATTR gpio_interrupt_handler(void *args)
 {
@@ -182,8 +296,14 @@ void getClock() {
   // Print clock HH:MM (Seconds excluded: rtcinfo.tm_sec)
   display.printerf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
 
+  // Convert seconds into HHH:MM:SS
+  int hr,m,s;
+  hr = (switch_on_sec_count/3600); 
+	m = (switch_on_sec_count -(3600*hr))/60;
+	s = (switch_on_sec_count -(3600*hr)-(m*60));
+
   display.setCursor(display.width()/2, y_start);
-  display.printerf("%d secs ON", switch_on_sec_count);
+  display.printerf("%03d:%02d:%02d ON", hr, m, s);
   //clockLayout(rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_sec);
 
   /* ESP_LOGI(pcTaskGetName(0), "%04d-%02d-%02d %02d:%02d:%02d, Week day:%d, %.2f °C", 
@@ -306,7 +426,7 @@ void app_main(void)
   delay(100);
   printf("RTC int state: %d\n\n", gpio_get_level(RTC_INT));
 
-  // Test Epd class
+  // Initialize Epd class, set rotation, default Font and orientation
   display.init();
   /**
    * @brief Note: 4 gray uses a second buffer. 
@@ -314,9 +434,25 @@ void app_main(void)
    */
   display.setMonoMode(true); // 4 gray: false
   display.setRotation(display_rotation);
-  //display.update();
   display.setFont(&Ubuntu_M8pt8b);
   display.setTextColor(EPD_BLACK);
+
+  // If time is not set then resync with WiFi (Make sure to add your WLAN access point name and password in:
+  // idf.py menuconfig -> Example Connection configuration
+  if (ds3231_get_time(&dev, &rtcinfo) != ESP_OK) {
+     ESP_LOGE(TAG, "Could not get time, please check that the I2C wiring is correct and has pull-ups in place in SCL / SDA lines.");
+     return;
+  }
+  // If this values come out of RTC time then it's not sync, most probably had a reset and no backup-power
+  if (rtcinfo.tm_year == 2000 && rtcinfo.tm_mon == 0) {
+     printf("Y:%d m:%d -> Calling NTP internet sync\n\n", rtcinfo.tm_year, rtcinfo.tm_mon);
+     display.setCursor(10,10);
+     display.print("RTC time & second alarm not set");
+     display.setCursor(10,40);
+     display.print("Connecting to do NTP time sync");
+     display.update();
+     setClock();
+  }
 
   // Please find setClock in set-rtc-clock.cpp
   drawUX();
