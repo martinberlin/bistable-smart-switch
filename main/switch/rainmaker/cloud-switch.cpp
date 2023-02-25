@@ -226,9 +226,10 @@ static void event_handler_rmk(void* arg, esp_event_base_t event_base,
                 break;
             case RMAKER_EVENT_WIFI_RESET:
                 ESP_LOGI(TAG, "Wi-Fi credentials reset.");
-                display.println("Wi-Fi credentials are cleared");
-                display.setCursor(10,30);
-                display.println("Will start in WiFi provisioning mode");
+                display.setCursor(10,20);
+                display.print("Wi-Fi credentials");
+                display.setCursor(10,40);
+                display.print("CLEARED.");
                 display.update();
                 break;
             case RMAKER_EVENT_FACTORY_RESET:
@@ -323,6 +324,11 @@ void app_main(void)
     gpio_set_direction((gpio_num_t)GPIO_RELAY_OFF, GPIO_MODE_OUTPUT);
     switchState(false); // OFF at the beginning
 
+    // Initialize epaper class
+    display.init(false);
+    display.setRotation(display_rotation);
+    display.setFont(&Ubuntu_M8pt8b);
+    display.setTextColor(EPD_BLACK);
     /* Enable timezone service which will be require for setting appropriate timezone
       * from the phone apps for scheduling to work correctly.
       * For more information on the various ways of setting timezone, please check
@@ -346,11 +352,7 @@ void app_main(void)
           abort();
       }
       
-   // Initialize epaper class
-   display.init(false);
-   display.setRotation(display_rotation);
-   display.setFont(&Ubuntu_M8pt8b);
-   display.setTextColor(EPD_BLACK);
+
    drawUX();
    
    // Instantiate touch. Important pass here the 3 required variables including display width and height
