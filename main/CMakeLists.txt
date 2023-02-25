@@ -12,9 +12,10 @@ message(STATUS "→ Building example for ${target}")
 
 # 3. Add DS3231 RTC to the Firmware
 # Run 1st to sync the clock with internet time NTP
-#set(app_sources "switch/rtc/set-rtc-clock.cpp")
-set(app_sources "switch/rtc/rtc-switch.cpp")
+set(app_sources "switch/rtc/set-rtc-clock.cpp")
+#set(app_sources "switch/rtc/rtc-switch.cpp")
 
+# Single Epaper tests
 #set(app_sources "tests/epd-27t91-test.cpp")
 
 set(app_requires
