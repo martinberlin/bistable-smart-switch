@@ -1,22 +1,24 @@
-# Bistable-smart-switch
-
-This is a project that started with the idea to use small, and inexpensive, SPI epapers with touch. The ones that I've found available and met that criteria are produced by Good-Display in Dalian.
-The idea is very simple: Use this bistable displays, or any others with very low consumption, to design a Switch that can replace a standard European one.
-I know is a lot of technology to turn on the light and at some point I though that no-one will buy a digital switch for a spaceship.
-
 **IMPORTANT:** This repository contains components added as github submodules. Please clone it using
 
     git clone --recurse-submodules https://github.com/martinberlin/bistable-smart-switch.git
-
-    or if you already cloned it without them just run additionally:
-
+        or if you already cloned it without them just run additionally:
     git submodule update --init --recursive
 
-**But it turns out that it sparked some interest since there are some interesting points that drive this:**
+# Bistable-smart-switch
+
+This is a project that started with the idea to use small, and inexpensive, SPI epapers with touch. The ones that I've found available and met that criteria are produced by Good-Display in Dalian.
+The idea is very simple: 
+
+> Use this bistable displays, or any others with very low consumption, to design a Switch that can replace a standard European one.
+
+I know is a lot of technology to turn on the light and at some point I though that no-one will buy a digital switch for a spaceship.
+
+**But it turns out that it got some attention since there are some interesting points that drive this:**
 
 - **ESP32-C3** is also an unexpensive, single Core, RISC-V Espressif MCU with 4 MB flash and the usual BLE/ WiFi combination
 - **Having touch and UX with a bistable display**, using our own component CalEPD and our own touch fork, gives us the freedom to be Code-light and make versatile examples that everyone can extend and collaborate
 - **ESP-Rainmaker** is a possibility that we already tested, so you can also turn ON/OFF the light with their application
+- **There are no similar smart switches** that come with full schematics, PCB's and example Firmware. If there are please tell us where since I'm interested to see what others are doing (We know already jung.de the zamel.com polish brand and more) But none of them offers a hackeable switch.
 
 All that we have already but it was around different repositories, where you had to configure CMakeFiles to point it to the right example and more...
 The goal of this repo is to put all this Switch ideas and code demos in a single place, make a WiKi with configuration tutorials and documentation. Just make it easy for the user to get started and build his first working Firmware in 10 minutes.
@@ -34,10 +36,8 @@ It consists in two PCBs and the display using C3 as Microcontroller:
 3. **The 2.7" display** with touch [GDEY027T91-T](https://github.com/martinberlin/cale-idf/wiki/Good-Display-gdey027T91)
 
 ![C3 controller](https://user-images.githubusercontent.com/2692928/218306248-25cc7c8f-0f09-4286-9bbc-a478964cdd3d.png)
-  
-![54x54mm AC-3.3 DC PCBview](Hardware/220AC-mini-C3-board/3D/img/PCB-top-view.png)
 
-![54x54mm AC-3.3 DC with Latch relay](Hardware/220AC-mini-C3-board/3D/img/3d-top.png)
+![3D-mains-power](https://user-images.githubusercontent.com/2692928/221372751-562f9575-4f89-46e7-bdba-bc4e5990be3c.png)
 
 ![2.7 touch FocalTech](https://www.good-display.com/repository/image/106fd348-0392-42a0-bdef-cf9f7e4926bb.jpg)
 
