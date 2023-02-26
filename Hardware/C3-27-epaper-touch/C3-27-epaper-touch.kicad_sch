@@ -6234,7 +6234,7 @@
     (property "Reference" "C13" (id 0) (at 328.93 62.23 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Value" "100nF" (id 1) (at 327.66 64.77 90)
+    (property "Value" "4.7uF" (id 1) (at 327.66 64.77 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Footprint" "Capacitor_SMD:C_0805_2012Metric" (id 2) (at 334.01 67.6148 0)
@@ -6243,7 +6243,7 @@
     (property "Datasheet" "~" (id 3) (at 330.2 68.58 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "LCSC" "C28233" (id 4) (at 330.2 68.58 0)
+    (property "LCSC" "C1779" (id 4) (at 330.2 68.58 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (pin "1" (uuid b1428b30-a610-4df5-80c9-0a774031ac98))
@@ -6649,7 +6649,7 @@
       (reference "C12") (unit 1) (value "4.7uF") (footprint "Capacitor_SMD:C_0603_1608Metric")
     )
     (path "/e010b6fb-2fb9-4bfd-b982-6a597128c5da"
-      (reference "C13") (unit 1) (value "100nF") (footprint "Capacitor_SMD:C_0805_2012Metric")
+      (reference "C13") (unit 1) (value "4.7uF") (footprint "Capacitor_SMD:C_0805_2012Metric")
     )
     (path "/858e1609-0117-4a64-a4cb-af2f22b2944b"
       (reference "C14") (unit 1) (value "10uF") (footprint "Capacitor_SMD:C_0805_2012Metric")
