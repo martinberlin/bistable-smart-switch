@@ -1249,8 +1249,8 @@
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 57cf6301-4c38-42a6-883d-4ab5b11aed35)
   )
-  (text "R1 (wire-wound resistor, required) 12Ω / 2W\nC1 and C11 is supposed to be only one CAP 22 uF but\nsince is too big, we add two smaller 12 uF"
-    (at 63.5 97.79 0)
+  (text "R1 (wire-wound resistor, required) 12Ω / 2W\nC1 and C11 is supposed to be only one CAP 22 uF but\nsince is too big, we add two smaller 12 uF\nUPDATE: In smaller round version 1.1 there was\nno place to put C1 so we excluded it from the board"
+    (at 63.5 102.87 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 9cff3b65-57d9-4e97-b581-48a359026d2e)
   )
