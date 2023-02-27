@@ -26,16 +26,25 @@
 #include <esp_rmaker_common_events.h>
 
 static const char *TAG = "SWITCH";
+// Strings in the UX (Labels of each form element)
 #define DEVICE_PARAM_1 "SWITCH"
+#define DEVICE_NAME "Device name"
+#define DEVICE_PARAM_CONSUMPTION "Device Watts"
+#define DEVICE_PARAM_KW_HOUR "Cost of each KW"
 #define DEVICE_PARAM_WIFI_RESET "Turn slider to 100 to reset WiFi"
 bool switch_state = false; // false = OFF
+
+char * switch_name = (char *)"EPD Switch";
+char * switch_consumption = (char *)"50";  // Default values can be changed in the app
+char * switch_kilowatt_hr = (char *)"0.5";
+
 bool ready_mqtt = false;
 // INTGPIO is touch interrupt, goes low when it detects a touch, which coordinates are read by I2C
 FT6X36 ts(CONFIG_TOUCH_INT);
 EpdSpi io;
 Gdey027T91 display(io);
 
-esp_rmaker_device_t *epaper_device;
+esp_rmaker_device_t *switch_device;
 // Values that will be stored in NVS - defaults here
 nvs_handle_t nvs_h;
 
@@ -306,18 +315,27 @@ void app_main(void)
     }
 
      /* Create a device and add the relevant parameters to it */
-    epaper_device = esp_rmaker_device_create("EPD Switch", ESP_RMAKER_DEVICE_SWITCH, NULL);
+    switch_device = esp_rmaker_device_create("EPD Switch", ESP_RMAKER_DEVICE_SWITCH, NULL);
     
-    esp_rmaker_device_add_cb(epaper_device, write_cb, NULL);
-    // Customized minutes till next refresh slider
+    esp_rmaker_device_add_cb(switch_device, write_cb, NULL);
     esp_rmaker_param_t *switch_param = esp_rmaker_power_param_create(DEVICE_PARAM_1, switch_state);
-    esp_rmaker_device_add_param(epaper_device, switch_param);
+    esp_rmaker_device_add_param(switch_device, switch_param);
+
+    // User provided consumption of the device plus cost of kiloWatt
+    esp_rmaker_param_t *consumption_param = esp_rmaker_name_param_create(DEVICE_PARAM_CONSUMPTION, switch_consumption);
+    esp_rmaker_device_add_param(switch_device, consumption_param);
+    esp_rmaker_param_t *kilowatt_cost_param = esp_rmaker_name_param_create(DEVICE_PARAM_KW_HOUR, switch_kilowatt_hr);
+    esp_rmaker_device_add_param(switch_device, kilowatt_cost_param);
+
+    // Name of the device
+    esp_rmaker_param_t *device_param = esp_rmaker_name_param_create(DEVICE_NAME, switch_name);
+    esp_rmaker_device_add_param(switch_device, device_param);
 
     esp_rmaker_param_t *reset_wifi = esp_rmaker_brightness_param_create(DEVICE_PARAM_WIFI_RESET, 0);
     esp_rmaker_param_add_bounds(reset_wifi, esp_rmaker_int(0), esp_rmaker_int(100), esp_rmaker_int(10));
-    esp_rmaker_device_add_param(epaper_device, reset_wifi);
+    esp_rmaker_device_add_param(switch_device, reset_wifi);
 
-    esp_rmaker_node_add_device(node, epaper_device);
+    esp_rmaker_node_add_device(node, switch_device);
 
    //Initialize GPIOs direction & initial states
     gpio_set_direction((gpio_num_t)GPIO_RELAY_ON, GPIO_MODE_OUTPUT);
