@@ -75,12 +75,13 @@ esp_rmaker_device_t *switch_device;
 const uint16_t signal_ms = 50;
 
 // Each time the counter hits this amount, store seconds counter in NVS and commit
-const uint16_t nvs_save_each_mins = 120;
+// Make this please multiple of 60 or you can get an inexact count (Will also show Red alert in Serial)
+const uint16_t nvs_save_each_secs = 120;
 
 xQueueHandle on_min_counter_queue;
 
 // Fonts are already included in components Fonts directory (Check it's CMakeFiles)
-#include <Ubuntu_M8pt8b.h>
+#include <Ubuntu_L7pt8b.h>
 #include <Ubuntu_M16pt8b.h>
 #include <Ubuntu_M36pt7b.h>
 // Translations: select only one
@@ -90,7 +91,7 @@ static const char *TAG = "Cloud-switch";
 struct tm rtcinfo;
 nvs_handle_t storage_handle;
 // Every 5 minutes the current_month count is updated
-int32_t min_l = 0; // last
+int32_t min_l = 0; // last month
 int32_t min_c = 0; // current
 
 esp_err_t ds3231_initialization_status = ESP_OK;
@@ -185,7 +186,7 @@ void setClock()
     display.setFont(&Ubuntu_M16pt8b);
     display.printerf("%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
 
-    display.setFont(&Ubuntu_M8pt8b);
+    display.setFont(&Ubuntu_L7pt8b);
     display.setCursor(10,110);
     display.println("RTC alarm set to tick every sec.");
     ds3231_clear_alarm_flags(&dev, DS3231_ALARM_1);
@@ -216,8 +217,19 @@ void on_Task(void *params)
         {
           if (switch_state) {
             switch_on_sec_count++;
-            if (switch_on_sec_count % nvs_save_each_mins == 0) {
-              min_c++;
+            if (switch_on_sec_count % nvs_save_each_secs == 0) {
+
+                if (ds3231_get_time(&dev, &rtcinfo) == ESP_OK) {
+                    // Each day 1 at 00:00 HRs reset secs counter and save last month in min_l
+                    if (rtcinfo.tm_mday == 1 && rtcinfo.tm_hour == 0 && rtcinfo.tm_min <= nvs_save_each_secs/60 && min_c>0) {
+                        nvs_set_i32(storage_handle, "min_l", min_c);
+                        min_l = min_c;
+                        min_c = -1;
+                        switch_on_sec_count = 0;
+                    }
+                }
+
+              min_c += nvs_save_each_secs /60;
               nvs_set_i32(storage_handle, "min_c", min_c);
               esp_err_t err = nvs_commit(storage_handle);
               printf((err != ESP_OK) ? "NVS persist failed!\n" : "NVS commit done\n");
@@ -226,7 +238,7 @@ void on_Task(void *params)
           ds3231_clear_alarm_flags(&dev, DS3231_ALARM_1);
           ds3231_clear_alarm_flags(&dev, DS3231_ALARM_2);
 
-          printf("ON for %d secs | this month:%d mins | Switch %s\n",
+          printf("ON:%d sec,%d min|pow:%s\n",
           switch_on_sec_count, (int)min_c, (switch_state)?(char*)"ON":(char*)"OFF");
         }
     }
@@ -316,12 +328,22 @@ void getClock() {
   display.printerf("%d   °C", (int)temp); //%.1f for float
 
   display.setTextColor(EPD_BLACK);
-  x_cursor = 10;
+  x_cursor = 5;
   y_start = display.height()-10;
-  display.setFont(&Ubuntu_M8pt8b);
+  display.setFont(&Ubuntu_L7pt8b);
   display.setCursor(x_cursor, y_start);
+  // Calculate consumption with this inputs: nvs_kw_float_cost nvs_watts switch_on_sec_count
+
+  double total_kw = (double)nvs_watts / (double)1000;
+  double switch_hrs = (double)switch_on_sec_count/(double)3600;
+  double total_kw_current_mon = total_kw * switch_hrs;
+  double total_kw_cost = total_kw_current_mon * nvs_kw_float_cost;
+  //printf("total_kw * switch_hrs %.2f * %.2f\n", total_kw ,switch_hrs);
+  //printf("total_kw_current_mon:%.2f secs:%d\n\n", total_kw_current_mon, switch_on_sec_count);
+  display.printerf("%.2f Kw %.2f $  %.1f°C", total_kw_current_mon, total_kw_cost, temp);
+  
   // Print clock HH:MM (Seconds excluded: rtcinfo.tm_sec)
-  display.printerf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
+  //display.printerf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
   //printf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
   // Convert seconds into HHH:MM:SS
   int hr,m,s;
@@ -329,7 +351,7 @@ void getClock() {
   m = (switch_on_sec_count -(3600*hr))/60;
   s = (switch_on_sec_count -(3600*hr)-(m*60));
 
-  display.setCursor(display.width()/2, y_start);
+  display.setCursor(display.width()/2+30, y_start);
   display.printerf("%03d:%02d:%02d ON", hr, m, s);
 }
 
@@ -355,7 +377,7 @@ void drawUX(){
   }
   
   char * label = (switch_state) ? (char *)"ON" : (char *)"OFF";
-  draw_centered_text(&Ubuntu_M8pt8b, label, dw/2-22, dh/2-sh, 40, 20);
+  draw_centered_text(&Ubuntu_L7pt8b, label, dw/2-22, dh/2-sh, 40, 20);
   display.update();
   // It does not work correctly with partial update leaves last position gray
   //display.updateWindow(dw/2-40, dh/2-keyh-40, 100, 86);
@@ -387,12 +409,14 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
     } else if (strcmp(param_name, DEVICE_PARAM_CONSUMPTION) == 0) {
         ESP_LOGI(TAG, "CONSUMPTION %d for %s-%s", (int)val.val.i, device_name, param_name);
         nvs_set_u16(storage_handle, "nvs_watts", (uint16_t) val.val.i);
+        nvs_watts = val.val.i;
         err = nvs_commit(storage_handle);
         printf((err != ESP_OK) ? "NVS Failed to store %d\n" : "NVS Stored %d\n", (int)val.val.i);
 
     } else if (strcmp(param_name, DEVICE_PARAM_KW_HOUR) == 0) {
         ESP_LOGI(TAG, "COST KW_HOUR %.2f for %s-%s", val.val.f, device_name, param_name);
         nvs_set_u16(storage_handle, "nvs_kw_cost", val.val.f * 1000); // Validate this
+        nvs_kw_float_cost = val.val.f;
         err = nvs_commit(storage_handle);
         printf((err != ESP_OK) ? "NVS Failed to store %.2f\n" : "NVS Stored %.2f\n", val.val.f);
 
@@ -504,7 +528,10 @@ void err_announcer(esp_err_t err, char * name, int value) {
 
 void app_main(void)
 {
-  printf("CalEPD version: %s\n", CALEPD_VERSION);
+  //printf("CalEPD version: %s\n", CALEPD_VERSION);
+  if (nvs_save_each_secs % 60 != 0) {
+    ESP_LOGE("nvs_save_each_secs", "Should be multiple of 60 and current value is %d", nvs_save_each_secs);
+  }
   esp_err_t err;
     // WiFi log level
     esp_log_level_set("wifi", ESP_LOG_ERROR);
@@ -522,14 +549,16 @@ void app_main(void)
     }
 
     // Read values from Non Volatile Storage
-    err = nvs_get_i32(storage_handle, "min_c", &min_c);
+    err = nvs_get_i32(storage_handle, "min_c", &min_c); // Current month
     err_announcer(err, (char *)"min_c", min_c);
+    err = nvs_get_i32(storage_handle, "min_l", &min_l); // Last month (still not shown in UX)
+    err_announcer(err, (char *)"min_l", min_l);
     err = nvs_get_u16(storage_handle, "nvs_watts", &nvs_watts);
     err_announcer(err, (char *)"nvs_watts", nvs_watts);
     err = nvs_get_u16(storage_handle, "nvs_kw_cost", &nvs_kw_cost);
     err_announcer(err, (char *)"nvs_kw_cost", nvs_kw_cost);
     nvs_kw_float_cost = (float)nvs_kw_cost / 1000;
-    printf("CHECK THIS Float %.2f", nvs_kw_float_cost);
+    
     // Init seconds to date
     switch_on_sec_count = min_c*60;
 
@@ -609,7 +638,7 @@ void app_main(void)
    */
   display.setMonoMode(true); // 4 gray: false
   display.setRotation(display_rotation);
-  display.setFont(&Ubuntu_M8pt8b);
+  display.setFont(&Ubuntu_L7pt8b);
   display.setTextColor(EPD_BLACK);
 
     /* Enable timezone service which will be require for setting appropriate timezone
