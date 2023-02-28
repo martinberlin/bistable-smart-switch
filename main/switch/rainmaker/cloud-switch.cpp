@@ -49,8 +49,8 @@ char * switch_consumption = (char *)"50";  // Default values can be changed in t
 char * switch_kilowatt_hr = (char *)"0.5";
 
 // Values stored in NVS
-uint16_t nvs_watts = 50;             // Default value
-char * nvs_kw_cost = (char *) "0.5"; // No floats in NVS so will need conversion
+uint16_t nvs_watts = 50;            // Default value
+uint16_t nvs_kw_cost = 500;         // 0.5 *1000 = 500
 float  nvs_kw_float_cost = 0.5;
 
 bool ready_mqtt = false;
@@ -390,6 +390,12 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
         err = nvs_commit(storage_handle);
         printf((err != ESP_OK) ? "NVS Failed to store %d\n" : "NVS Stored %d\n", (int)val.val.i);
 
+    } else if (strcmp(param_name, DEVICE_PARAM_KW_HOUR) == 0) {
+        ESP_LOGI(TAG, "COST KW_HOUR %.2f for %s-%s", val.val.f, device_name, param_name);
+        nvs_set_u16(storage_handle, "nvs_kw_cost", val.val.f * 1000); // Validate this
+        err = nvs_commit(storage_handle);
+        printf((err != ESP_OK) ? "NVS Failed to store %.2f\n" : "NVS Stored %.2f\n", val.val.f);
+
     } else if (strcmp(param_name, DEVICE_PARAM_WIFI_RESET) == 0) {
         ESP_LOGI(TAG, "WIFI_RESET %d for %s-%s",
                (int) val.val.i, device_name, param_name);
@@ -515,6 +521,18 @@ void app_main(void)
         printf("NVS opened\n");
     }
 
+    // Read values from Non Volatile Storage
+    err = nvs_get_i32(storage_handle, "min_c", &min_c);
+    err_announcer(err, (char *)"min_c", min_c);
+    err = nvs_get_u16(storage_handle, "nvs_watts", &nvs_watts);
+    err_announcer(err, (char *)"nvs_watts", nvs_watts);
+    err = nvs_get_u16(storage_handle, "nvs_kw_cost", &nvs_kw_cost);
+    err_announcer(err, (char *)"nvs_kw_cost", nvs_kw_cost);
+    nvs_kw_float_cost = (float)nvs_kw_cost / 1000;
+    printf("CHECK THIS Float %.2f", nvs_kw_float_cost);
+    // Init seconds to date
+    switch_on_sec_count = min_c*60;
+
     /* Initialize Wi-Fi. Note that, this should be called before esp_rmaker_init()
      */
     app_wifi_init();
@@ -550,11 +568,15 @@ void app_main(void)
     esp_rmaker_device_add_param(switch_device, device_param);
 
     // User provided consumption of the device plus cost of kiloWatt
-    esp_rmaker_param_t *consumption_param = esp_rmaker_name_param_create(DEVICE_PARAM_CONSUMPTION, switch_consumption);
+    esp_rmaker_param_t *consumption_param = esp_rmaker_brightness_param_create(DEVICE_PARAM_CONSUMPTION, nvs_watts); // SLIDER 0->200
+    esp_rmaker_param_add_bounds(consumption_param, esp_rmaker_int(0), esp_rmaker_int(200), esp_rmaker_int(10));
     esp_rmaker_device_add_param(switch_device, consumption_param);
-    
 
-    esp_rmaker_param_t *kilowatt_cost_param = esp_rmaker_name_param_create(DEVICE_PARAM_KW_HOUR, switch_kilowatt_hr);
+    esp_rmaker_param_t *kilowatt_cost_param = esp_rmaker_param_create(DEVICE_PARAM_KW_HOUR, ESP_RMAKER_PARAM_TEMPERATURE,
+        esp_rmaker_float(nvs_kw_float_cost), PROP_FLAG_READ | PROP_FLAG_WRITE);
+    if (kilowatt_cost_param) {
+        esp_rmaker_param_add_ui_type(kilowatt_cost_param, ESP_RMAKER_UI_TEXT);
+    }
     esp_rmaker_device_add_param(switch_device, kilowatt_cost_param);
 
 
@@ -568,14 +590,6 @@ void app_main(void)
     gpio_set_direction((gpio_num_t)GPIO_RELAY_ON, GPIO_MODE_OUTPUT);
     gpio_set_direction((gpio_num_t)GPIO_RELAY_OFF, GPIO_MODE_OUTPUT);
     switchState(false); // OFF at the beginning
-
-    // Read values from Non Volatile Storage
-    err = nvs_get_i32(storage_handle, "min_c", &min_c);
-    err_announcer(err, (char *)"min_c", min_c);
-    err = nvs_get_u16(storage_handle, "nvs_watts", &nvs_watts);
-    err_announcer(err, (char *)"nvs_watts", nvs_watts);
-    // Init seconds to date
-    switch_on_sec_count = min_c*60;
 
     // Initialize RTC
     ds3231_initialization_status = ds3231_init_desc(&dev, I2C_NUM_0, (gpio_num_t) CONFIG_SDA_GPIO, (gpio_num_t) CONFIG_SCL_GPIO);
