@@ -7,7 +7,9 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/gpio.h"
+// I2C RTC
 #include "ds3231.h"
+// I2C Touch
 #include "FT6X36.h"
 // Non-Volatile Storage (NVS)
 #include "esp_system.h"
@@ -23,14 +25,19 @@
 #include "english.h"
 //#include "gdew027w3.h"
 #include "goodisplay/gdey027T91.h"
-#include "goodisplay/gdey029T94.h"
+
 // INTGPIO is touch interrupt, goes low when it detects a touch, which coordinates are read by I2C
 FT6X36 ts(CONFIG_TOUCH_INT);
 EpdSpi io;
 Gdey027T91 display(io);
-//Gdey029T94 display(io);
-// Only debugging:
-//#define DEBUG_COUNT_TOUCH
+//#define DEBUG_COUNT_TOUCH   // Only debugging
+
+
+/** DEVICE CONSUMTION CONFIG 
+    Please edit this two values to make the switch aware of how much consumes the lamp you are controlling */
+#define DEVICE_CONSUMPTION_WATTS 100
+double  DEVICE_KW_HOUR_COST    = 0.4;  // € or $ in device appears only $ since there is an issue printing Euro sign
+
 
 // Relay Latch (high) / OFF
 #define GPIO_RELAY_ON 1
@@ -39,13 +46,18 @@ Gdey027T91 display(io);
 #define RTC_INT GPIO_NUM_6
 // Pulse to move the switch in millis
 const uint16_t signal_ms = 50;
+
+// Each time the counter hits this amount, store seconds counter in NVS and commit
+// Make this please multiple of 60 or you can get an inexact count (Will also show Red alert in Serial)
+const uint16_t nvs_save_each_secs = 120;
+
 xQueueHandle on_min_counter_queue;
 
 // FONT used for title / message body - Only after display library
 //Converting fonts with ümlauts: ./fontconvert *.ttf 18 32 252
 
 // Fonts are already included in components Fonts directory (Check it's CMakeFiles)
-#include <Ubuntu_M8pt8b.h>
+#include <Ubuntu_L7pt8b.h>
 #include <Ubuntu_M16pt8b.h>
 #include <Ubuntu_M36pt7b.h>
 
@@ -62,6 +74,7 @@ uint8_t display_rotation = 1;
 bool switch_state = false; // starts false = OFF
 
 int switch_on_sec_count = 0;
+int switch_all_sec_count = 0;
 
 // I2C descriptor
 i2c_dev_t dev;
@@ -164,7 +177,7 @@ void setClock()
     display.setFont(&Ubuntu_M16pt8b);
     display.printerf("%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
 
-    display.setFont(&Ubuntu_M8pt8b);
+    display.setFont(&Ubuntu_L7pt8b);
     display.setCursor(10,110);
     display.println("RTC alarm set to tick every sec.");
     ds3231_clear_alarm_flags(&dev, DS3231_ALARM_1);
@@ -193,19 +206,39 @@ void on_Task(void *params)
     {
         if (xQueueReceive(on_min_counter_queue, &pinNumber, portMAX_DELAY))
         {
-          if (switch_state) {
-            switch_on_sec_count++;
-            if (switch_on_sec_count % 60 == 0) {
-              min_c++;
-              nvs_set_i32(storage_handle, "min_c", min_c);
-              esp_err_t err = nvs_commit(storage_handle);
-              printf((err != ESP_OK) ? "NVS persist failed!\n" : "NVS commit done\n");
-            }
+            switch_all_sec_count++;
+            if (switch_all_sec_count % nvs_save_each_secs == 0) {
+                // This should be done in a much more efficient way
+                if (ds3231_get_time(&dev, &rtcinfo) == ESP_OK) {
+                    // Each day 1 at 00:00 HRs reset secs counter and save last month in min_l
+                    ESP_LOGI("DS3231", "Attempt RST counter|mday:%d hr:%d min:%d", rtcinfo.tm_mday,rtcinfo.tm_hour, rtcinfo.tm_min);
+                    uint8_t save_each_mins = nvs_save_each_secs/60;
+                    if (rtcinfo.tm_mday == 1 && rtcinfo.tm_hour == 0 && rtcinfo.tm_min <= save_each_mins*2 && min_c > save_each_mins) {
+                        printf("RESET Counter and save last month totals\n\n");
+                        nvs_set_i32(storage_handle, "min_l", min_c);
+                        min_l = min_c;
+                        min_c = -1;
+                        switch_on_sec_count = 0;
+                        switch_all_sec_count = 0;
+                    }
+                } else {
+                    ESP_LOGE("on_Task", "DS3231 could not get_time");
+                }
+          }
+          // Count only when switch is ON
+            if (switch_state) {
+                switch_on_sec_count++;
+                if (switch_on_sec_count % nvs_save_each_secs == 0) {
+                        min_c += nvs_save_each_secs /60;
+                        nvs_set_i32(storage_handle, "min_c", min_c);
+                        esp_err_t err = nvs_commit(storage_handle);
+                        printf((err != ESP_OK) ? "NVS persist failed!\n" : "NVS commit\n");
+                    }
           }
           ds3231_clear_alarm_flags(&dev, DS3231_ALARM_1);
           ds3231_clear_alarm_flags(&dev, DS3231_ALARM_2);
 
-          printf("ON for %d secs | this month:%d mins | Switch %s\n",
+          printf("ON:%d sec,%d min|pow:%s\n",
           switch_on_sec_count, (int)min_c, (switch_state)?(char*)"ON":(char*)"OFF");
         }
     }
@@ -289,26 +322,31 @@ void getClock() {
   display.printerf("%d   °C", (int)temp); //%.1f for float
 
   display.setTextColor(EPD_BLACK);
-  x_cursor = 10;
+  x_cursor = 5;
   y_start = display.height()-10;
-  display.setFont(&Ubuntu_M8pt8b);
+  display.setFont(&Ubuntu_L7pt8b);
   display.setCursor(x_cursor, y_start);
-  // Print clock HH:MM (Seconds excluded: rtcinfo.tm_sec)
-  display.printerf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
+  // Calculate consumption with this inputs: DEVICE_KW_HOUR_COST nvs_watts switch_on_sec_count
 
+  double total_kw = (double)DEVICE_CONSUMPTION_WATTS / (double)1000;
+  double switch_hrs = (double)switch_on_sec_count/(double)3600;
+  double total_kw_current_mon = total_kw * switch_hrs;
+  double total_kw_cost = total_kw_current_mon * DEVICE_KW_HOUR_COST;
+  //printf("total_kw * switch_hrs %.2f * %.2f\n", total_kw ,switch_hrs);
+  //printf("total_kw_current_mon:%.2f secs:%d\n\n", total_kw_current_mon, switch_on_sec_count);
+  display.printerf("%.2f Kw %.2f $  %.1f°C", total_kw_current_mon, total_kw_cost, temp);
+  
+  // Print clock HH:MM (Seconds excluded: rtcinfo.tm_sec)
+  //display.printerf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
+  //printf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
   // Convert seconds into HHH:MM:SS
   int hr,m,s;
   hr = (switch_on_sec_count/3600); 
-	m = (switch_on_sec_count -(3600*hr))/60;
-	s = (switch_on_sec_count -(3600*hr)-(m*60));
+  m = (switch_on_sec_count -(3600*hr))/60;
+  s = (switch_on_sec_count -(3600*hr)-(m*60));
 
-  display.setCursor(display.width()/2, y_start);
+  display.setCursor(display.width()/2+30, y_start);
   display.printerf("%03d:%02d:%02d ON", hr, m, s);
-  //clockLayout(rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_sec);
-
-  /* ESP_LOGI(pcTaskGetName(0), "%04d-%02d-%02d %02d:%02d:%02d, Week day:%d, %.2f °C", 
-      rtcinfo.tm_year, rtcinfo.tm_mon + 1,
-      rtcinfo.tm_mday, rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_sec, rtcinfo.tm_wday, temp); */
 }
 
 void drawUX(){
@@ -338,7 +376,7 @@ void drawUX(){
   }
   
   char * label = (switch_state) ? (char *)"ON" : (char *)"OFF";
-  draw_centered_text(&Ubuntu_M8pt8b, label, dw/2-22, dh/2-sh, 40, 20);
+  draw_centered_text(&Ubuntu_L7pt8b, label, dw/2-22, dh/2-sh, 40, 20);
   display.update();
   // It does not work correctly with partial update leaves last position gray
   //display.updateWindow(dw/2-40, dh/2-keyh-40, 100, 86);
@@ -359,6 +397,20 @@ void touchEvent(TPoint p, TEvent e)
 
   switch_state = !switch_state;
   drawUX();
+}
+
+// Generic function to read NVS values and leave feedback
+void err_announcer(esp_err_t err, char * name, int value) {
+    switch (err) {
+        case ESP_OK:
+            printf("OK %s=%d\n", name, value);
+            break;
+        case ESP_ERR_NVS_NOT_FOUND:
+            printf("The %s is not initialized yet in NVS\n", name);
+            break;
+        default :
+            ESP_LOGE(name, "Error (%s) reading!\n", esp_err_to_name(err));
+    }
 }
 
 void app_main(void)
@@ -401,18 +453,12 @@ void app_main(void)
   gpio_set_direction((gpio_num_t)GPIO_RELAY_OFF, GPIO_MODE_OUTPUT);
   switchState(false); // OFF at the beginning
   
-  // Read minutes of current month of Non Volatile Storage. Init seconds to date
-  err = nvs_get_i32(storage_handle, "min_c", &min_c);
-  switch (err) {
-            case ESP_OK:
-                printf("OK min_c=%ld minutes (total current month)\n", min_c);
-                break;
-            case ESP_ERR_NVS_NOT_FOUND:
-                printf("The min_c is not initialized yet in NVS\n");
-                break;
-            default :
-                printf("Error (%s) reading!\n", esp_err_to_name(err));
-        }
+  // Read values from Non Volatile Storage
+  err = nvs_get_i32(storage_handle, "min_c", &min_c); // Current month
+  err_announcer(err, (char *)"min_c", min_c);
+  err = nvs_get_i32(storage_handle, "min_l", &min_l); // Last month (still not shown in UX)
+  err_announcer(err, (char *)"min_l", min_l);
+
   switch_on_sec_count = min_c*60;
 
   // Initialize RTC
@@ -423,7 +469,7 @@ void app_main(void)
   // On start clear alarm
   ds3231_clear_alarm_flags(&dev, DS3231_ALARM_1);
   ds3231_clear_alarm_flags(&dev, DS3231_ALARM_2); // 2 needs to be initially cleared too
-  delay(100);
+  delay(10);
   printf("RTC int state: %d\n\n", gpio_get_level(RTC_INT));
 
   // Initialize Epd class, set rotation, default Font and orientation
@@ -434,7 +480,7 @@ void app_main(void)
    */
   display.setMonoMode(true); // 4 gray: false
   display.setRotation(display_rotation);
-  display.setFont(&Ubuntu_M8pt8b);
+  display.setFont(&Ubuntu_L7pt8b);
   display.setTextColor(EPD_BLACK);
 
   // If time is not set then resync with WiFi (Make sure to add your WLAN access point name and password in:
