@@ -100,6 +100,7 @@ esp_err_t ds3231_initialization_status = ESP_OK;
 bool switch_state = false; // starts false = OFF
 
 int switch_on_sec_count = 0;
+int switch_all_sec_count = 0;
 
 // I2C descriptor
 i2c_dev_t dev;
@@ -215,24 +216,34 @@ void on_Task(void *params)
     {
         if (xQueueReceive(on_min_counter_queue, &pinNumber, portMAX_DELAY))
         {
-            if (switch_on_sec_count % nvs_save_each_secs == 0) {
+            switch_all_sec_count++;
+            if (switch_all_sec_count % nvs_save_each_secs == 0) {
                 // This should be done in a much more efficient way
                 if (ds3231_get_time(&dev, &rtcinfo) == ESP_OK) {
                     // Each day 1 at 00:00 HRs reset secs counter and save last month in min_l
-                    if (rtcinfo.tm_mday == 1 && rtcinfo.tm_hour == 0 && rtcinfo.tm_min <= nvs_save_each_secs/60+1 && min_c>0) {
+                    ESP_LOGI("DS3231", "Attempt RST counter|mday:%d hr:%d min:%d", rtcinfo.tm_mday,rtcinfo.tm_hour, rtcinfo.tm_min);
+                    uint8_t save_each_mins = nvs_save_each_secs/60;
+                    if (rtcinfo.tm_mday == 1 && rtcinfo.tm_hour == 0 && rtcinfo.tm_min <= save_each_mins*2 && min_c > save_each_mins) {
+                        printf("RESET Counter and save last month totals\n\n");
                         nvs_set_i32(storage_handle, "min_l", min_c);
                         min_l = min_c;
                         min_c = -1;
                         switch_on_sec_count = 0;
+                        switch_all_sec_count = 0;
                     }
+                } else {
+                    ESP_LOGE("on_Task", "DS3231 could not get_time");
                 }
-                if (switch_state) {
-                    switch_on_sec_count++;
-                    min_c += nvs_save_each_secs /60;
-                    nvs_set_i32(storage_handle, "min_c", min_c);
-                    esp_err_t err = nvs_commit(storage_handle);
-                    printf((err != ESP_OK) ? "NVS persist failed!\n" : "NVS commit done\n");
-                }
+          }
+          if (switch_on_sec_count % nvs_save_each_secs == 0) {
+            // Count only when switch is ON
+            if (switch_state) {
+                switch_on_sec_count++;
+                min_c += nvs_save_each_secs /60;
+                nvs_set_i32(storage_handle, "min_c", min_c);
+                esp_err_t err = nvs_commit(storage_handle);
+                printf((err != ESP_OK) ? "NVS persist failed!\n" : "NVS commit\n");
+            }
           }
           ds3231_clear_alarm_flags(&dev, DS3231_ALARM_1);
           ds3231_clear_alarm_flags(&dev, DS3231_ALARM_2);
