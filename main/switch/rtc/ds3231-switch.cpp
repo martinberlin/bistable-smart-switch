@@ -351,8 +351,9 @@ void getClock() {
   double switch_hrs = (double)switch_on_sec_count/(double)3600;
   double total_kw_current_mon = total_kw * switch_hrs;
   double total_kw_cost = total_kw_current_mon * DEVICE_KW_HOUR_COST;
+  // Temp excluded:  %.1f°C
   //draw_centered_text(const GFXfont *font, int16_t x, int16_t y, uint16_t w, uint16_t h, const char* format, ...)
-  draw_centered_text(&Ubuntu_L7pt8b,x_cursor,y_start,display.width(),12,"%.2f Kw %.2f $  %.1f°C", total_kw_current_mon, total_kw_cost, temp);
+  draw_centered_text(&Ubuntu_L7pt8b,x_cursor,y_start,display.width(),12,"%.2f Kw %.2f $", total_kw_current_mon, total_kw_cost);
   
   //printf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
   // Convert seconds into HHH:MM:SS
@@ -363,7 +364,7 @@ void getClock() {
 
   x_cursor = display.width()/2+30;
   if (display_rotation == 0 || display_rotation == 2) {
-    y_start = display.height()-15;
+    y_start = display.height()-20;
     x_cursor = 1;
   }
 
