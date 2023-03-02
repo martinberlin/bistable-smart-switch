@@ -30,6 +30,12 @@
 FT6X36 ts(CONFIG_TOUCH_INT);
 EpdSpi io;
 Gdey027T91 display(io);
+// 1||3 = Landscape  0||2 = Portrait mode. Using 0 usually the bottom is at the side of FPC connector
+uint8_t display_rotation = 2;
+// Mono mode = true for faster monochrome update. 4 grays is nice but slower
+bool display_mono_mode = true;
+// Print big temperature (Needs 4 gray mode: display_mono_mode = false)
+bool print_big_temperature = false;
 //#define DEBUG_COUNT_TOUCH   // Only debugging
 
 
@@ -49,7 +55,7 @@ const uint16_t signal_ms = 50;
 
 // Each time the counter hits this amount, store seconds counter in NVS and commit
 // Make this please multiple of 60 or you can get an inexact count (Will also show Red alert in Serial)
-const uint16_t nvs_save_each_secs = 120;
+const uint16_t nvs_save_each_secs = 240;
 
 xQueueHandle on_min_counter_queue;
 
@@ -69,7 +75,7 @@ int32_t min_l = 0;
 int32_t min_c = 0;
 
 esp_err_t ds3231_initialization_status = ESP_OK;
-uint8_t display_rotation = 1;
+
 // Switch always starts OFF when Firmware starts
 bool switch_state = false; // starts false = OFF
 
@@ -252,18 +258,30 @@ uint16_t circleRadio = 10;
 uint16_t selectTextColor  = EPD_WHITE;
 uint16_t selectBackground = EPD_BLACK;
 
-void draw_centered_text(const GFXfont *font, char * text, int16_t x, int16_t y, uint16_t w, uint16_t h) {
+void draw_centered_text(const GFXfont *font, int16_t x, int16_t y, uint16_t w, uint16_t h, const char* format, ...) {
+    // Handle printf arguments
+    va_list args;
+    va_start(args, format);
+    char max_buffer[1024];
+    int size = vsnprintf(max_buffer, sizeof max_buffer, format, args);
+    va_end(args);
+    string text = "";
+    if (size < sizeof(max_buffer)) {
+      text = string(max_buffer);
+      
+    } else {
+      ESP_LOGE("draw_centered_text", "max_buffer out of range. Increase max_buffer!");
+    }
     // Draw external boundary where text needs to be centered in the middle
     //printf("drawRect x:%d y:%d w:%d h:%d\n\n", x, y, w, h);
     display.fillRect(x, y, w, h, EPD_WHITE);
-
     display.setFont(font);
     int16_t text_x = 0;
     int16_t text_y = 0;
     uint16_t text_w = 0;
     uint16_t text_h = 0;
 
-    display.getTextBounds(text, x, y, &text_x, &text_y, &text_w, &text_h);
+    display.getTextBounds(text.c_str(), x, y, &text_x, &text_y, &text_w, &text_h);
     //printf("text_x:%d y:%d w:%d h:%d\n\n", text_x,text_y,text_w,text_h);
     //display.drawRect(text_x, text_y, text_w, text_h, EPD_BLACK); // text boundaries
 
@@ -294,8 +312,7 @@ void switchState(bool state) {
 }
 
 void getClock() {
-  // Clean display
-  display.fillScreen(EPD_WHITE);
+  display.fillScreen(EPD_WHITE); // Clean display
 
   // Get RTC date and time
   float temp;
@@ -311,33 +328,32 @@ void getClock() {
   //ESP_LOGI("CLOCK", "\n%s\n%02d:%02d", weekday_t[rtcinfo.tm_wday], rtcinfo.tm_hour, rtcinfo.tm_min);
 
   // Starting coordinates:
-  uint16_t y_start = display.height()/2-40;
-  uint16_t x_cursor = 21;
+  uint16_t y_start = display.height()-10;
+  uint16_t x_cursor = 1;
+  // For portrait mode update this coordinates
+  if (display_rotation == 0 || display_rotation == 2) {
+    y_start = 5;
+  }
   
-  // Print temperature
-  display.setFont(&Ubuntu_M36pt7b);
-  display.setTextColor(EPD_LIGHTGREY);
- 
-  display.setCursor(x_cursor, y_start);
-  display.printerf("%d   °C", (int)temp); //%.1f for float
+  // Print temperature (optional)
+  if (print_big_temperature) {
+    y_start = display.height()/2-40;
+    x_cursor = 21;
+    display.setFont(&Ubuntu_M36pt7b);
+    display.setTextColor(EPD_LIGHTGREY);
+    display.setCursor(x_cursor, y_start);
+    display.printerf("%d   °C", (int)temp); //%.1f for float
+    display.setTextColor(EPD_BLACK);
+  }
 
-  display.setTextColor(EPD_BLACK);
-  x_cursor = 5;
-  y_start = display.height()-10;
-  display.setFont(&Ubuntu_L7pt8b);
-  display.setCursor(x_cursor, y_start);
   // Calculate consumption with this inputs: DEVICE_KW_HOUR_COST nvs_watts switch_on_sec_count
-
   double total_kw = (double)DEVICE_CONSUMPTION_WATTS / (double)1000;
   double switch_hrs = (double)switch_on_sec_count/(double)3600;
   double total_kw_current_mon = total_kw * switch_hrs;
   double total_kw_cost = total_kw_current_mon * DEVICE_KW_HOUR_COST;
-  //printf("total_kw * switch_hrs %.2f * %.2f\n", total_kw ,switch_hrs);
-  //printf("total_kw_current_mon:%.2f secs:%d\n\n", total_kw_current_mon, switch_on_sec_count);
-  display.printerf("%.2f Kw %.2f $  %.1f°C", total_kw_current_mon, total_kw_cost, temp);
+  //draw_centered_text(const GFXfont *font, int16_t x, int16_t y, uint16_t w, uint16_t h, const char* format, ...)
+  draw_centered_text(&Ubuntu_L7pt8b,x_cursor,y_start,display.width(),12,"%.2f Kw %.2f $  %.1f°C", total_kw_current_mon, total_kw_cost, temp);
   
-  // Print clock HH:MM (Seconds excluded: rtcinfo.tm_sec)
-  //display.printerf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
   //printf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
   // Convert seconds into HHH:MM:SS
   int hr,m,s;
@@ -345,8 +361,13 @@ void getClock() {
   m = (switch_on_sec_count -(3600*hr))/60;
   s = (switch_on_sec_count -(3600*hr)-(m*60));
 
-  display.setCursor(display.width()/2+30, y_start);
-  display.printerf("%03d:%02d:%02d ON", hr, m, s);
+  x_cursor = display.width()/2+30;
+  if (display_rotation == 0 || display_rotation == 2) {
+    y_start = display.height()-15;
+    x_cursor = 1;
+  }
+
+  draw_centered_text(&Ubuntu_L7pt8b,x_cursor,y_start,display.width(),12,"%03d:%02d:%02d ON", hr, m, s);
 }
 
 void drawUX(){
@@ -376,7 +397,7 @@ void drawUX(){
   }
   
   char * label = (switch_state) ? (char *)"ON" : (char *)"OFF";
-  draw_centered_text(&Ubuntu_L7pt8b, label, dw/2-22, dh/2-sh, 40, 20);
+  draw_centered_text(&Ubuntu_L7pt8b, dw/2-22, dh/2-sh, 40, 20, label);
   display.update();
   // It does not work correctly with partial update leaves last position gray
   //display.updateWindow(dw/2-40, dh/2-keyh-40, 100, 86);
@@ -478,7 +499,7 @@ void app_main(void)
    * @brief Note: 4 gray uses a second buffer. 
    * Nice thing about disabling is that all what you write in gray will not be visible when you are in mono mode
    */
-  display.setMonoMode(true); // 4 gray: false
+  display.setMonoMode(display_mono_mode); // 4 gray: false
   display.setRotation(display_rotation);
   display.setFont(&Ubuntu_L7pt8b);
   display.setTextColor(EPD_BLACK);
