@@ -11,10 +11,11 @@ message(STATUS "→ Building example for ${target}")
 #set(app_sources "switch/getting-started/i2c-scan.cpp")
 
 # 3. Add DS3231 RTC to the Firmware
-set(app_sources "switch/rtc/ds3231-switch.cpp")
+#set(app_sources "switch/rtc/ds3231-switch.cpp")
+set(app_sources "switch/rtc/pcf8563-switch.cpp")
 
 # Only set-clock example: 
-#set(app_sources "switch/rtc/set-rtc-clock.cpp")
+#set(app_sources "switch/rtc/ds3231-set-rtc-clock.cpp")
 # Single Epaper tests
 #set(app_sources "tests/epd-27t91-test.cpp")
 
