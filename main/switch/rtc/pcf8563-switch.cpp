@@ -151,12 +151,13 @@ void on_Task(void *params)
                 if (pcf8563_get_time(&dev, &rtcinfo) == ESP_OK) {
                     // Each day 1 at 00:00 HRs reset secs counter and save last month in min_l
                     ESP_LOGI("PCF", "Attempt RST counter|mday:%d hr:%d min:%d", rtcinfo.tm_mday,rtcinfo.tm_hour, rtcinfo.tm_min);
-                    
                     if (rtcinfo.tm_mday == 1 && rtcinfo.tm_hour == 0 && rtcinfo.tm_min <= nvs_save_each_mins && min_c > nvs_save_each_mins) {
+                    //if (rtcinfo.tm_mday == 9 && rtcinfo.tm_hour == 11 && min_c > nvs_save_each_mins) { //Debug Reset counter
                         printf("RESET Counter and save last month totals\n\n");
-                        nvs_set_i32(storage_handle, "min_l", min_c);
                         min_l = min_c;
-                        min_c = -1;
+                        min_c = 0;
+                        nvs_set_i32(storage_handle, "min_l", min_l);
+                        nvs_set_i32(storage_handle, "min_c", min_c);
                         switch_on_min_count = 0;
                         switch_all_min_count = 0;
                     }
@@ -317,10 +318,9 @@ void getClock() {
   
   //printf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
   // Convert seconds into HHH:MM:SS
-  int hr,m,s;
-  hr = (switch_on_min_count/60); 
-  m = (switch_on_min_count -(60*hr))/60;
-  s = (switch_on_min_count -(60*hr)-(m*60));
+  int hr,m;
+  hr = (switch_on_min_count/60);
+  m = switch_on_min_count -(60*hr);
 
   x_cursor = display.width()/2+30;
   if (display_rotation == 0 || display_rotation == 2) {
@@ -328,7 +328,7 @@ void getClock() {
     x_cursor = 1;
   }
 
-  draw_centered_text(&Ubuntu_L7pt8b,x_cursor,y_start,display.width(),12,"%03d:%02d:%02d ON", hr, m, s);
+  draw_centered_text(&Ubuntu_L7pt8b,x_cursor,y_start,display.width(),12,"%03d:%02d min. ON", hr, m);
 }
 
 void drawUX() {
