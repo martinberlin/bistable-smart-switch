@@ -215,18 +215,15 @@ void draw_centered_text(const GFXfont *font, int16_t x, int16_t y, uint16_t w, u
     uint16_t text_h = 0;
 
     display.getTextBounds(text.c_str(), x, y, &text_x, &text_y, &text_w, &text_h);
-    //printf("text_x:%d y:%d w:%d h:%d\n\n", text_x,text_y,text_w,text_h);
-    //display.drawRect(text_x, text_y, text_w, text_h, EPD_BLACK); // text boundaries
 
     if (text_w > w) {
-        ESP_LOGE("draw_centered_text", "W: Text width out of bounds");
+        ESP_LOGI("draw_centered_text", "W: Text width out of bounds");
     }
     if (text_h > h) {
-        ESP_LOGE("draw_centered_text", "W: Text height out of bounds");
+        ESP_LOGI("draw_centered_text", "W: Text height out of bounds");
     }
     // Calculate the middle position
     text_x += (w-text_w)/2;
-
     uint ty = (h/2)+y+(text_h/2);
     display.setCursor(text_x, ty);
     display.print(text);
@@ -279,7 +276,8 @@ void setClock()
         .tm_hour = timeinfo.tm_hour,
         .tm_mday = timeinfo.tm_mday,
         .tm_mon  = timeinfo.tm_mon,  // 0-based
-        .tm_year = timeinfo.tm_year + 1900,  
+        .tm_year = timeinfo.tm_year + 1900,
+        .tm_wday = timeinfo.tm_wday
     };
 
     if (pcf8563_set_time(&dev, &time) != ESP_OK) {
@@ -334,7 +332,6 @@ void getClock() {
 }
 
 void drawUX() {
-  ESP_LOGI("drawUX()", "getClock");
   getClock();
   uint16_t dw = display.width();
   uint16_t dh = display.height();
@@ -460,9 +457,8 @@ void app_main(void)
 
 
 // Initialize RTC
-  if (pcf8563_init_desc(&dev, I2C_NUM_1, (gpio_num_t) CONFIG_SDA_GPIO, (gpio_num_t)CONFIG_SCL_GPIO) != ESP_OK) {
-      ESP_LOGE(pcTaskGetName(0), "Could not init device descriptor.");
-      while (1) { vTaskDelay(1); }
+  if (pcf8563_init_desc(&dev, I2C_NUM_0, (gpio_num_t) CONFIG_SDA_GPIO, (gpio_num_t)CONFIG_SCL_GPIO) != ESP_OK) {
+      ESP_LOGE(pcTaskGetName(0), "Could not init PCF8563 descriptor since touch already did that");
   }
   
   // If time is not set then resync with WiFi (Make sure to add your WLAN access point name and password in:
@@ -475,7 +471,7 @@ void app_main(void)
   printf("pcf8563 TIME: %02d:%02d %02d/%02d/%d\n\n", rtcinfo.tm_hour, rtcinfo.tm_min,
                                   rtcinfo.tm_mday, rtcinfo.tm_mon+1, rtcinfo.tm_year);
   
-  // If this values come out of RTC time then it's not sync, most probably had a reset and no backup-power
+  // If this values are matched then RTC clock needs to get time from NTP
   if (rtcinfo.tm_year == 2000) {
      printf("Y:%d m:%d -> Calling NTP internet sync\n\n", rtcinfo.tm_year, rtcinfo.tm_mon);
      display.setCursor(10,10);
@@ -503,9 +499,7 @@ void app_main(void)
   on_min_counter_queue = xQueueCreate(10, sizeof(int));
   xTaskCreate(on_Task, "on-counter", 2048, NULL, 1, NULL);
 
-
-  //drawUX(); // Still works OK from here
-  // Touch loop. If youu find a smarter way to do this please make a Merge request
+  // Touch loop. If youu find a smarter way to do this please make a Merge request ( github.com/martinberlin/FT6X36-IDF )
   while (true) {
     ts.loop();
   }
