@@ -28,6 +28,7 @@
 #include "goodisplay/gdey029T94.h"
 
 // INTGPIO is touch interrupt, goes low when it detects a touch, which coordinates are read by I2C
+// #define DEBUG_COUNT_TOUCH   // Only debugging
 FT6X36 ts(CONFIG_TOUCH_INT);
 EpdSpi io;
 //Gdey027T91 display(io);
@@ -36,8 +37,6 @@ Gdey029T94 display(io);
 uint8_t display_rotation = 2;
 // Mono mode = true for faster monochrome update. 4 grays is nice but slower
 bool display_mono_mode = true;
-
-//#define DEBUG_COUNT_TOUCH   // Only debugging
 
 
 /** DEVICE CONSUMTION CONFIG 
@@ -49,13 +48,14 @@ double  DEVICE_KW_HOUR_COST    = 0.4;  // € or $ in device appears only $ sinc
 // Relay Latch (high) / OFF
 #define GPIO_RELAY_ON 1
 #define GPIO_RELAY_OFF 3
-
+// GPIO_NUM_2 in C3
 #define RTC_INT GPIO_NUM_4
 // Pulse to move the switch in millis
 const uint16_t signal_ms = 50;
 
-// Each time the counter hits this amount, store minutes counter in NVS and commit
-const uint16_t nvs_save_each_mins = 2;
+// Each time the counter hits this amount, store seconds counter in NVS and commit
+// Make this please multiple of 60 or you can get an inexact count (Will also show Red alert in Serial)
+const uint16_t nvs_save_each_secs = 240;
 
 xQueueHandle on_min_counter_queue;
 
@@ -77,8 +77,8 @@ int32_t min_c = 0;
 // Switch always starts OFF when Firmware starts
 bool switch_state = false; // starts false = OFF
 
-int switch_on_min_count = 0;
-int switch_all_min_count = 0;
+int switch_on_sec_count = 0;
+int switch_all_sec_count = 0;
 
 // I2C descriptor
 i2c_dev_t dev;
@@ -144,42 +144,40 @@ void on_Task(void *params)
     {
         if (xQueueReceive(on_min_counter_queue, &pinNumber, portMAX_DELAY))
         {
-            switch_all_min_count++;
-
-            if (switch_all_min_count % nvs_save_each_mins == 0) {
+            switch_all_sec_count++;
+            if (switch_all_sec_count % nvs_save_each_secs == 0) {
                 // This should be done in a much more efficient way
                 if (pcf8563_get_time(&dev, &rtcinfo) == ESP_OK) {
                     // Each day 1 at 00:00 HRs reset secs counter and save last month in min_l
-                    ESP_LOGI("PCF", "Attempt RST counter|mday:%d hr:%d min:%d", rtcinfo.tm_mday,rtcinfo.tm_hour, rtcinfo.tm_min);
-                    if (rtcinfo.tm_mday == 1 && rtcinfo.tm_hour == 0 && rtcinfo.tm_min <= nvs_save_each_mins && min_c > nvs_save_each_mins) {
-                    //if (rtcinfo.tm_mday == 9 && rtcinfo.tm_hour == 11 && min_c > nvs_save_each_mins) { //Debug Reset counter
+                    ESP_LOGI("PCF8563", "Attempt RST counter|mday:%d hr:%d min:%d", rtcinfo.tm_mday,rtcinfo.tm_hour, rtcinfo.tm_min);
+                    uint8_t save_each_mins = nvs_save_each_secs/60;
+                    if (rtcinfo.tm_mday == 1 && rtcinfo.tm_hour == 0 && rtcinfo.tm_min <= save_each_mins*2 && min_c > save_each_mins) {
                         printf("RESET Counter and save last month totals\n\n");
+                        nvs_set_i32(storage_handle, "min_l", min_c);
                         min_l = min_c;
-                        min_c = 0;
-                        nvs_set_i32(storage_handle, "min_l", min_l);
-                        nvs_set_i32(storage_handle, "min_c", min_c);
-                        switch_on_min_count = 0;
-                        switch_all_min_count = 0;
+                        min_c = -1;
+                        switch_on_sec_count = 0;
+                        switch_all_sec_count = 0;
                     }
                 } else {
-                    ESP_LOGE("on_Task", "PCF could not get_time");
+                    ESP_LOGE("on_Task", "DS3231 could not get_time");
                 }
           }
           // Count only when switch is ON
             if (switch_state) {
-               switch_on_min_count++;
-                if (switch_on_min_count % nvs_save_each_mins == 0) {
-                        min_c += nvs_save_each_mins;
+                switch_on_sec_count++;
+                if (switch_on_sec_count % nvs_save_each_secs == 0) {
+                        min_c += nvs_save_each_secs /60;
                         nvs_set_i32(storage_handle, "min_c", min_c);
                         esp_err_t err = nvs_commit(storage_handle);
                         printf((err != ESP_OK) ? "NVS persist failed!\n" : "NVS commit\n");
                     }
           }
-          // Clear alarm/timer flags
+          //Not needed since it's reset on each read
           pcf8563_get_flags(&dev);
 
-          printf("ON:%d min|min_c:%d pow:%s\n",
-         switch_on_min_count, (int)min_c, (switch_state)?(char*)"ON":(char*)"OFF");
+          printf("ON:%d sec,%d min|pow:%s\n",
+          switch_on_sec_count, (int)min_c, (switch_state)?(char*)"ON":(char*)"OFF");
         }
     }
 }
@@ -307,20 +305,21 @@ void getClock() {
     y_start = 5;
   }
   
-  // Calculate consumption with this inputs: DEVICE_KW_HOUR_COST nvs_wattsswitch_on_min_count
+  // Calculate consumption with this inputs: DEVICE_KW_HOUR_COST nvs_watts switch_on_sec_count
   double total_kw = (double)DEVICE_CONSUMPTION_WATTS / (double)1000;
-  double switch_hrs = (double)switch_on_min_count/(double)60;
+  double switch_hrs = (double)switch_on_sec_count/(double)3600;
   double total_kw_current_mon = total_kw * switch_hrs;
   double total_kw_cost = total_kw_current_mon * DEVICE_KW_HOUR_COST;
+
   // Temp excluded:  %.1f°C
   //draw_centered_text(const GFXfont *font, int16_t x, int16_t y, uint16_t w, uint16_t h, const char* format, ...)
   draw_centered_text(&Ubuntu_L7pt8b,x_cursor,y_start,display.width(),12,"%.2f Kw %.2f $", total_kw_current_mon, total_kw_cost);
   
-  //printf("%02d:%02d %d/%02d", rtcinfo.tm_hour, rtcinfo.tm_min, rtcinfo.tm_mday, rtcinfo.tm_mon+1);
   // Convert seconds into HHH:MM:SS
-  int hr,m;
-  hr = (switch_on_min_count/60);
-  m = switch_on_min_count -(60*hr);
+  int hr,m,s;
+  hr = (switch_on_sec_count/3600);
+  m = (switch_on_sec_count -(3600*hr))/60;
+  s = (switch_on_sec_count -(3600*hr)-(m*60));
 
   x_cursor = display.width()/2+30;
   if (display_rotation == 0 || display_rotation == 2) {
@@ -328,7 +327,7 @@ void getClock() {
     x_cursor = 1;
   }
 
-  draw_centered_text(&Ubuntu_L7pt8b,x_cursor,y_start,display.width(),12,"%03d:%02d min. ON", hr, m);
+  draw_centered_text(&Ubuntu_L7pt8b,x_cursor,y_start,display.width(),12,"%03d:%02d:%02d ON", hr, m, s);
 }
 
 void drawUX() {
@@ -418,7 +417,7 @@ void app_main(void)
     printf("NVS opened\n");
   }
 
-  gpio_pullup_en(RTC_INT);
+  //gpio_pullup_en(RTC_INT);
   gpio_set_direction(RTC_INT, GPIO_MODE_INPUT);
   ESP_LOGI("RTC INT", "when IO %d is Low", (int)RTC_INT);
   // Setup interrupt for this IO that goes low on the interrupt
@@ -436,8 +435,7 @@ void app_main(void)
   err = nvs_get_i32(storage_handle, "min_l", &min_l); // Last month (still not shown in UX)
   err_announcer(err, (char *)"min_l", min_l);
   // Initialize ON count with NVS count
-  switch_on_min_count = min_c;
-
+  switch_on_sec_count = min_c*60;
   // Initialize Epd class, set rotation, default Font and orientation
   display.init();
   /**
@@ -448,13 +446,6 @@ void app_main(void)
   display.setRotation(display_rotation);
   display.setFont(&Ubuntu_L7pt8b);
   display.setTextColor(EPD_BLACK);
-
-  // Instantiate touch. Important pass here the 3 required variables including display width and height
-  // printf("Touch will complain that GPIO isr service is already installed (RTC seconds counter did it)\n");
-  ts.begin(FT6X36_DEFAULT_THRESHOLD, display.width(), display.height());
-  ts.setRotation(display.getRotation());
-  ts.registerTouchHandler(touchEvent);
-
 
 // Initialize RTC
   if (pcf8563_init_desc(&dev, I2C_NUM_0, (gpio_num_t) CONFIG_SDA_GPIO, (gpio_num_t)CONFIG_SCL_GPIO) != ESP_OK) {
@@ -482,15 +473,13 @@ void app_main(void)
      setClock();
   }
   
-  printf("RTC int state: %d\n\n", gpio_get_level(RTC_INT));
-
-  // It's generating only an interrupt per minute
-  pcf8563_set_timer(&dev, 1, PCF8563_CLK_32HZ);
-  printf("PCF set_timer: %d\n\n", PCF8563_CLK_32HZ);
+  
+  // Every second         1 sec= 1 HZ , divider (If it would be two then will tick 2x per second)
+  pcf8563_set_timer(&dev, PCF8563_CLK_1HZ, 1);
   pcf8563_enable_timer(&dev);
 
-  // Please find setClock in set-rtc-clock.cpp
-  drawUX();
+  printf("RTC int state: %d (Should be 1 at start)\n\n", gpio_get_level(RTC_INT));
+
 
   // PCF Minute alarm: Still need to find out how to correctly set it and extend my class
   gpio_install_isr_service(0); // Is already used by touch!
@@ -499,6 +488,11 @@ void app_main(void)
   on_min_counter_queue = xQueueCreate(10, sizeof(int));
   xTaskCreate(on_Task, "on-counter", 2048, NULL, 1, NULL);
 
+  ts.begin(FT6X36_DEFAULT_THRESHOLD, display.width(), display.height());
+  ts.setRotation(display.getRotation());
+  ts.registerTouchHandler(touchEvent);
+  
+  drawUX();
   // Touch loop. If youu find a smarter way to do this please make a Merge request ( github.com/martinberlin/FT6X36-IDF )
   while (true) {
     ts.loop();
