@@ -2,6 +2,10 @@
 set(srcs 
     # RTC
     "ds3231/main/ds3231.c"
+
+    # NXP RTC
+    "pcf8563/main/pcf8563.c"
+
     # Touch controller Focal Tech
     "ft6x36/FT6X36.cpp"
     # Shared between both
@@ -14,5 +18,6 @@ idf_component_register(SRCS ${srcs}
     REQUIRES driver esp_timer
 	INCLUDE_DIRS "ds3231/main"
                  "ft6x36/include"
-		     "include"
+                 "pcf8563/main"
+		         "include"
 )
