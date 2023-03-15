@@ -31,8 +31,8 @@
 // #define DEBUG_COUNT_TOUCH   // Only debugging
 FT6X36 ts(CONFIG_TOUCH_INT);
 EpdSpi io;
-//Gdey027T91 display(io);
-Gdey029T94 display(io);
+Gdey027T91 display(io);
+
 // 1||3 = Landscape  0||2 = Portrait mode. Using 0 usually the bottom is at the side of FPC connector
 uint8_t display_rotation = 2;
 // Mono mode = true for faster monochrome update. 4 grays is nice but slower
@@ -49,7 +49,7 @@ double  DEVICE_KW_HOUR_COST    = 0.4;  // € or $ in device appears only $ sinc
 #define GPIO_RELAY_ON 1
 #define GPIO_RELAY_OFF 3
 // GPIO_NUM_2 in C3
-#define RTC_INT GPIO_NUM_4
+#define RTC_INT GPIO_NUM_2
 // Pulse to move the switch in millis
 const uint16_t signal_ms = 50;
 
@@ -173,7 +173,7 @@ void on_Task(void *params)
                         printf((err != ESP_OK) ? "NVS persist failed!\n" : "NVS commit\n");
                     }
           }
-          //Not needed since it's reset on each read
+          // Clear timer flags
           pcf8563_get_flags(&dev);
 
           printf("ON:%d sec,%d min|pow:%s\n",
@@ -396,7 +396,7 @@ void err_announcer(esp_err_t err, char * name, int value) {
 
 void app_main(void)
 {
-  printf("CalEPD version: %s\n", CALEPD_VERSION);
+  printf("CalEPD version: %s\nLast reset reason:%d\n", CALEPD_VERSION, esp_reset_reason());
 
   // Initialize NVS
   esp_err_t err = nvs_flash_init();
@@ -417,7 +417,7 @@ void app_main(void)
     printf("NVS opened\n");
   }
 
-  //gpio_pullup_en(RTC_INT);
+  gpio_pullup_en(RTC_INT);
   gpio_set_direction(RTC_INT, GPIO_MODE_INPUT);
   ESP_LOGI("RTC INT", "when IO %d is Low", (int)RTC_INT);
   // Setup interrupt for this IO that goes low on the interrupt
@@ -463,7 +463,7 @@ void app_main(void)
                                   rtcinfo.tm_mday, rtcinfo.tm_mon+1, rtcinfo.tm_year);
   
   // If this values are matched then RTC clock needs to get time from NTP
-  if (rtcinfo.tm_year == 2000) {
+  if (rtcinfo.tm_year == 2151) {
      printf("Y:%d m:%d -> Calling NTP internet sync\n\n", rtcinfo.tm_year, rtcinfo.tm_mon);
      display.setCursor(10,10);
      display.print("RTC time & second alarm not set");
@@ -473,12 +473,12 @@ void app_main(void)
      setClock();
   }
   
-  
+  printf("bef settimer RTC int state: %d (Should be 1 at start)\n\n", gpio_get_level(RTC_INT));
   // Every second         1 sec= 1 HZ , divider (If it would be two then will tick 2x per second)
   pcf8563_set_timer(&dev, PCF8563_CLK_1HZ, 1);
   pcf8563_enable_timer(&dev);
-
-  printf("RTC int state: %d (Should be 1 at start)\n\n", gpio_get_level(RTC_INT));
+  pcf8563_get_flags(&dev);
+  printf("after RTC int state: %d (Should be 1 at start)\n\n", gpio_get_level(RTC_INT));
 
 
   // PCF Minute alarm: Still need to find out how to correctly set it and extend my class
