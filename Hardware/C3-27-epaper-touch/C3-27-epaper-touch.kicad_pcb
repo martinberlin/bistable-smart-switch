@@ -5,6 +5,13 @@
   )
 
   (paper "A4")
+  (title_block
+    (title "C3 epaper controller w/touch")
+    (date "2023-03-15")
+    (rev "1.2")
+    (company "FASANI CORPORATION")
+  )
+
   (layers
     (0 "F.Cu" signal)
     (1 "In1.Cu" signal)
@@ -1918,7 +1925,7 @@
     (at 120.01 98.18 -90)
     (descr "Resistor SMD 0603 (1608 Metric), square (rectangular) end terminal, IPC_7351 nominal, (Body size source: IPC-SM-782 page 72, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf), generated with kicad-footprint-generator")
     (tags "resistor")
-    (property "LCSC" "C25804")
+    (property "LCSC" "C23162")
     (property "Sheetfile" "C3-27-epaper-touch.kicad_sch")
     (property "Sheetname" "")
     (path "/965882ad-ba10-4813-8e31-868947a9b01b")
@@ -1927,7 +1934,7 @@
       (effects (font (size 0.7 0.7) (thickness 0.13)))
       (tstamp 8847bb8d-4456-4238-9257-0fc1137e7ff7)
     )
-    (fp_text value "10 K" (at 0 1.43 90) (layer "F.Fab")
+    (fp_text value "4.7K" (at 0 1.43 90) (layer "F.Fab")
       (effects (font (size 1 1) (thickness 0.15)))
       (tstamp f329457c-dcb9-4f9a-be5a-1c85d486da8e)
     )
