@@ -73,10 +73,14 @@ void app_main()
             case 0x38:
                 device = (char *)"FT6X36 Touch";
                 break;
+            case 0x51:
+                device = (char *)"PCF8563 RTC";
+                break;
             case 0x68:
                 device = (char *)"DS3231 RTC";
                 break;
             default:
+                device = (char *)"unknown";
                 break;
             }
             printf("Found device at: 0x%2x %s\n", i, device);

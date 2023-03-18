@@ -10,6 +10,7 @@
 
 //#include "gdew027w3.h"
 #include "goodisplay/gdey027T91.h"
+//#include "goodisplay/gdey029T94.h"
 // INTGPIO is touch interrupt, goes low when it detects a touch, which coordinates are read by I2C
 FT6X36 ts(CONFIG_TOUCH_INT);
 EpdSpi io;
