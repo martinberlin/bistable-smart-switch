@@ -3904,8 +3904,8 @@
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 23da59b9-05c5-4ec8-8e2f-b5247ba33576)
   )
-  (text "REV DESCRIPTION\n1.2 R12 RTC interrupt pull-up now changed to 4K7\n1.1 C3 working PCB only one issue found: RTC INT pull-up 10K is reporting always LOW\n1.0 Initial version with many Harware errors (MOSI routed to IO9, that needs to be pull-up in BOOT)"
-    (at 242.57 175.26 0)
+  (text "REV DESCRIPTION\n1.2 R12 RTC interrupt pull-up now changed to 4K7\n    Added R16 22Ω currrent limiter to charge RTC backup capacitors\n1.1 C3 working PCB only one issue found: RTC INT pull-up 10K is reporting always LOW\n1.0 Initial version with many Harware errors (MOSI routed to IO9, that needs to be pull-up in BOOT)"
+    (at 242.57 182.88 0)
     (effects (font (size 2 2)) (justify left bottom))
     (uuid 27d8e073-3c07-4137-9ece-d6a24e91b461)
   )
