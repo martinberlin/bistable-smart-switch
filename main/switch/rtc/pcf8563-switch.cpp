@@ -37,13 +37,12 @@ Gdey027T91 display(io);
 uint8_t display_rotation = 2;
 // Mono mode = true for faster monochrome update. 4 grays is nice but slower
 bool display_mono_mode = true;
-
+bool display_dark_mode = true;
 
 /** DEVICE CONSUMTION CONFIG 
     Please edit this two values to make the switch aware of how much consumes the lamp you are controlling */
 #define DEVICE_CONSUMPTION_WATTS 100
 double  DEVICE_KW_HOUR_COST    = 0.4;  // € or $ in device appears only $ since there is an issue printing Euro sign
-
 
 // Relay Latch (high) / OFF
 #define GPIO_RELAY_ON 1
@@ -79,6 +78,9 @@ bool switch_state = false; // starts false = OFF
 
 int switch_on_sec_count = 0;
 int switch_all_sec_count = 0;
+// Default colors
+uint16_t display_text_color = EPD_BLACK;
+uint16_t display_back_color = EPD_WHITE;
 
 // I2C descriptor
 i2c_dev_t dev;
@@ -182,14 +184,6 @@ void on_Task(void *params)
     }
 }
 
-// Some GFX constants
-uint16_t blockHeight = display.height()/4;
-uint16_t lineSpacing = 18;
-uint16_t circleColor = EPD_BLACK;
-uint16_t circleRadio = 10;
-uint16_t selectTextColor  = EPD_WHITE;
-uint16_t selectBackground = EPD_BLACK;
-
 void draw_centered_text(const GFXfont *font, int16_t x, int16_t y, uint16_t w, uint16_t h, const char* format, ...) {
     // Handle printf arguments
     va_list args;
@@ -206,7 +200,7 @@ void draw_centered_text(const GFXfont *font, int16_t x, int16_t y, uint16_t w, u
     }
     // Draw external boundary where text needs to be centered in the middle
     //printf("drawRect x:%d y:%d w:%d h:%d\n\n", x, y, w, h);
-    display.fillRect(x, y, w, h, EPD_WHITE);
+    display.fillRect(x, y, w, h, display_back_color);
     display.setFont(font);
     int16_t text_x = 0;
     int16_t text_y = 0;
@@ -287,7 +281,7 @@ void setClock()
 }
 
 void getClock() {
-  display.fillScreen(EPD_WHITE); // Clean display
+  display.fillScreen(display_back_color); // Clean display
   // I2CDEV: Could not read from device in the 2x time. TODO: Find why
   // Get RTC date and time
   if (pcf8563_get_time(&dev, &rtcinfo) != ESP_OK) {
@@ -338,18 +332,18 @@ void drawUX() {
   uint8_t  sh = 50;
   uint8_t  keyw = 16;
   uint8_t  keyh = 16;
-  display.fillRoundRect(dw/2-sw/2, dh/2-sh/2, sw, sh, 4, EPD_WHITE);
-  display.drawRoundRect(dw/2-sw/2, dh/2-sh/2, sw, sh, 4, EPD_BLACK);
+  display.fillRoundRect(dw/2-sw/2, dh/2-sh/2, sw, sh, 4, display_back_color);
+  display.drawRoundRect(dw/2-sw/2, dh/2-sh/2, sw, sh, 4, display_text_color);
 
   // OFF position
   if (!switch_state) {
-    display.fillRoundRect(dw/2-keyw/2, dh/2, keyw, keyh, 5, EPD_BLACK);
+    display.fillRoundRect(dw/2-keyw/2, dh/2, keyw, keyh, 5, display_text_color);
     gpio_set_level((gpio_num_t)GPIO_RELAY_OFF, 1); // OFF
     delay(signal_ms);
     gpio_set_level((gpio_num_t)GPIO_RELAY_OFF, 0); // OFF release
     printf("Draw OFF\n\n");
   } else {
-    display.fillRoundRect(dw/2-keyw/2, dh/2-keyh, keyw, keyh, 5, EPD_BLACK);
+    display.fillRoundRect(dw/2-keyw/2, dh/2-keyh, keyw, keyh, 5, display_text_color);
     gpio_set_level((gpio_num_t)GPIO_RELAY_ON, 1); // ON
     delay(signal_ms);
     gpio_set_level((gpio_num_t)GPIO_RELAY_ON, 0); // ON release
@@ -397,7 +391,10 @@ void err_announcer(esp_err_t err, char * name, int value) {
 void app_main(void)
 {
   printf("CalEPD version: %s\nLast reset reason:%d\n", CALEPD_VERSION, esp_reset_reason());
-
+  if (display_dark_mode) {
+    display_text_color = EPD_WHITE;
+    display_back_color = EPD_BLACK;
+  }
   // Initialize NVS
   esp_err_t err = nvs_flash_init();
   if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -423,7 +420,6 @@ void app_main(void)
   // Setup interrupt for this IO that goes low on the interrupt
   gpio_set_intr_type(RTC_INT, GPIO_INTR_NEGEDGE);
 
-
   //Initialize GPIOs direction & initial states
   gpio_set_direction((gpio_num_t)GPIO_RELAY_ON, GPIO_MODE_OUTPUT);
   gpio_set_direction((gpio_num_t)GPIO_RELAY_OFF, GPIO_MODE_OUTPUT);
@@ -445,7 +441,8 @@ void app_main(void)
   display.setMonoMode(display_mono_mode); // 4 gray: false
   display.setRotation(display_rotation);
   display.setFont(&Ubuntu_L7pt8b);
-  display.setTextColor(EPD_BLACK);
+  display.setTextColor(display_text_color);
+  printf("display background color:%x\n\n", display_back_color);
 
 // Initialize RTC
   if (pcf8563_init_desc(&dev, I2C_NUM_0, (gpio_num_t) CONFIG_SDA_GPIO, (gpio_num_t)CONFIG_SCL_GPIO) != ESP_OK) {
@@ -463,12 +460,12 @@ void app_main(void)
                                   rtcinfo.tm_mday, rtcinfo.tm_mon+1, rtcinfo.tm_year);
   
   // If this values are matched then RTC clock needs to get time from NTP
-  if (rtcinfo.tm_year == 2151) {
+  if (rtcinfo.tm_year == 2152) {
      printf("Y:%d m:%d -> Calling NTP internet sync\n\n", rtcinfo.tm_year, rtcinfo.tm_mon);
      display.setCursor(10,10);
-     display.print("RTC time & second alarm not set");
+     display.print("RTC second alarm not set");
      display.setCursor(10,40);
-     display.print("Connecting to do NTP time sync");
+     display.print("Connecting NTP time sync");
      display.update();
      setClock();
   }
