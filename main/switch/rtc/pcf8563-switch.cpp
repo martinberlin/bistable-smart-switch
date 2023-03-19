@@ -460,7 +460,7 @@ void app_main(void)
                                   rtcinfo.tm_mday, rtcinfo.tm_mon+1, rtcinfo.tm_year);
   
   // If this values are matched then RTC clock needs to get time from NTP
-  if (rtcinfo.tm_year == 2152) {
+  if (rtcinfo.tm_year> 2100 || rtcinfo.tm_mday == 0) {
      printf("Y:%d m:%d -> Calling NTP internet sync\n\n", rtcinfo.tm_year, rtcinfo.tm_mon);
      display.setCursor(10,10);
      display.print("RTC second alarm not set");
