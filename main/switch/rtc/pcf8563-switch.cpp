@@ -353,7 +353,7 @@ void drawUX() {
   char * label = (switch_state) ? (char *)"ON" : (char *)"OFF";
   draw_centered_text(&Ubuntu_L7pt8b, dw/2-22, dh/2-sh, 40, 20, label);
 
-  display.update();
+  
   // It does not work correctly with partial update leaves last position gray
   //display.updateWindow(dw/2-40, dh/2-keyh-40, 100, 86);
 }
@@ -367,11 +367,13 @@ void touchEvent(TPoint p, TEvent e)
     printf("e %x %d  ",e,t_counter); // Working
   #endif
 
-  if (e != TEvent::Tap && e != TEvent::DragStart && e != TEvent::DragMove && e != TEvent::DragEnd)
+  if (e != TEvent::Tap)
     return;
 
   switch_state = !switch_state;
   drawUX();
+  draw_centered_text(&Ubuntu_L7pt8b,1,display.height()-40,display.width(),12,"x:%d y:%d", p.x , p.y);
+  display.update();
 }
 
 // Generic function to read NVS values and leave feedback
@@ -490,6 +492,7 @@ void app_main(void)
   ts.registerTouchHandler(touchEvent);
   
   drawUX();
+  display.update();
   // Touch loop. If youu find a smarter way to do this please make a Merge request ( github.com/martinberlin/FT6X36-IDF )
   while (true) {
     ts.loop();

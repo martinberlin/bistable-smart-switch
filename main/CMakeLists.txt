@@ -12,8 +12,8 @@ message(STATUS "→ Building example for ${target}")
 
 # 3. Add DS3231 RTC to the Firmware
 #set(app_sources "switch/rtc/ds3231-switch.cpp")
-set(app_sources "switch/rtc/pcf8563-switch.cpp")
-
+#set(app_sources "switch/rtc/pcf8563-switch.cpp")
+set(app_sources "buttons/6-button-actions.cpp")
 # Only set-clock example: 
 #set(app_sources "switch/rtc/ds3231-set-rtc-clock.cpp")
 # Single Epaper tests
