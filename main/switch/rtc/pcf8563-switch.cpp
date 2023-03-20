@@ -493,7 +493,7 @@ void app_main(void)
   
   drawUX();
   display.update();
-  // Touch loop. If youu find a smarter way to do this please make a Merge request ( github.com/martinberlin/FT6X36-IDF )
+  // Touch loop. If you find a smarter way to do this please make a Merge request ( github.com/martinberlin/FT6X36-IDF )
   while (true) {
     ts.loop();
   }
