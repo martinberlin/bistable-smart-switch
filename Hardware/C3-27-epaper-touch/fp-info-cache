@@ -1,4 +1,4 @@
-21440190859060709
+21441872902492311
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -89382,6 +89382,13 @@ Q13FC1350000400-Crystal
 0
 2
 2
+footprint
+RT9013-33GB
+SOT23_5_1
+Power Supply
+0
+5
+5
 footprint
 SP0503BAHTG
 SP0503BAHTG-1
