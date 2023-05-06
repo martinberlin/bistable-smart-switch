@@ -9,6 +9,7 @@
 #include "driver/gpio.h"
 // I2C RTC
 #include "pcf8563.h"
+#define CONFIG_NTP_SERVER "pool.ntp.org"
 // I2C Touch
 #include "FT6X36.h"
 // Non-Volatile Storage (NVS)
@@ -24,17 +25,17 @@
 // Translations: select only one
 #include "english.h"
 //#include "gdew027w3.h"
-#include "goodisplay/gdey027T91.h"
+#include "goodisplay/gdey0154d67.h"
 #include "goodisplay/gdey029T94.h"
 
 // INTGPIO is touch interrupt, goes low when it detects a touch, which coordinates are read by I2C
 // #define DEBUG_COUNT_TOUCH   // Only debugging
 FT6X36 ts(CONFIG_TOUCH_INT);
 EpdSpi io;
-Gdey027T91 display(io);
+Gdey0154d67 display(io);
 
 // 1||3 = Landscape  0||2 = Portrait mode. Using 0 usually the bottom is at the side of FPC connector
-uint8_t display_rotation = 2;
+uint8_t display_rotation = 1;
 // Mono mode = true for faster monochrome update. 4 grays is nice but slower
 bool display_mono_mode = true;
 
@@ -46,9 +47,9 @@ double  DEVICE_KW_HOUR_COST    = 0.4;  // € or $ in device appears only $ sinc
 
 
 // Relay Latch (high) / OFF
-#define GPIO_RELAY_ON 1
+#define GPIO_RELAY_ON 2
 #define GPIO_RELAY_OFF 3
-// GPIO_NUM_2 in C3
+// GPIO_NUM_2 in C3 | GPIO_NUM_1 in watch mini PCB 
 #define RTC_INT GPIO_NUM_2
 // Pulse to move the switch in millis
 const uint16_t signal_ms = 50;
@@ -298,7 +299,7 @@ void getClock() {
   ESP_LOGI("CLOCK", "\n%s\n%02d:%02d", weekday_t[rtcinfo.tm_wday], rtcinfo.tm_hour, rtcinfo.tm_min);
 
   // Starting coordinates:
-  uint16_t y_start = display.height()-10;
+  uint16_t y_start = display.height()-20;
   uint16_t x_cursor = 1;
   // For portrait mode update this coordinates
   if (display_rotation == 0 || display_rotation == 2) {
@@ -324,14 +325,17 @@ void getClock() {
   x_cursor = display.width()/2+30;
   if (display_rotation == 0 || display_rotation == 2) {
     y_start = display.height()-20;
-    x_cursor = 1;
+    x_cursor = 10;
   }
 
-  draw_centered_text(&Ubuntu_L7pt8b,x_cursor,y_start,display.width(),12,"%03d:%02d:%02d ON", hr, m, s);
+  draw_centered_text(&Ubuntu_L7pt8b,x_cursor+10,20,display.width(),12,"%03d:%02d:%02d ON", hr, m, s);
 }
 
-void drawUX() {
+void drawUX(int tx, int ty) {
   getClock();
+  display.setCursor(10, 20);
+  display.printerf("x:%d y:%d", tx, ty);
+
   uint16_t dw = display.width();
   uint16_t dh = display.height();
   uint8_t  sw = 20;
@@ -377,7 +381,8 @@ void touchEvent(TPoint p, TEvent e)
     return;
 
   switch_state = !switch_state;
-  drawUX();
+  
+  drawUX(p.x,p.y);
 }
 
 // Generic function to read NVS values and leave feedback
@@ -462,8 +467,7 @@ void app_main(void)
   printf("pcf8563 TIME: %02d:%02d %02d/%02d/%d\n\n", rtcinfo.tm_hour, rtcinfo.tm_min,
                                   rtcinfo.tm_mday, rtcinfo.tm_mon+1, rtcinfo.tm_year);
   
-  // If this values are matched then RTC clock needs to get time from NTP
-  if (rtcinfo.tm_year == 2151) {
+  #ifdef CONFIG_SET_CLOCK
      printf("Y:%d m:%d -> Calling NTP internet sync\n\n", rtcinfo.tm_year, rtcinfo.tm_mon);
      display.setCursor(10,10);
      display.print("RTC time & second alarm not set");
@@ -471,7 +475,7 @@ void app_main(void)
      display.print("Connecting to do NTP time sync");
      display.update();
      setClock();
-  }
+  #endif
   
   printf("bef settimer RTC int state: %d (Should be 1 at start)\n\n", gpio_get_level(RTC_INT));
   // Every second         1 sec= 1 HZ , divider (If it would be two then will tick 2x per second)
@@ -492,7 +496,7 @@ void app_main(void)
   ts.setRotation(display.getRotation());
   ts.registerTouchHandler(touchEvent);
   
-  drawUX();
+  drawUX(0,0);
   // Touch loop. If youu find a smarter way to do this please make a Merge request ( github.com/martinberlin/FT6X36-IDF )
   while (true) {
     ts.loop();
