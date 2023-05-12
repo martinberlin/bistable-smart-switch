@@ -25,14 +25,14 @@
 // Translations: select only one
 #include "english.h"
 //#include "gdew027w3.h"
-#include "goodisplay/gdey0154d67.h"
-#include "goodisplay/gdey029T94.h"
+//#include "goodisplay/gdey0154d67.h" // Tiny switch test
+#include "goodisplay/gdey027T91.h"
 
 // INTGPIO is touch interrupt, goes low when it detects a touch, which coordinates are read by I2C
 // #define DEBUG_COUNT_TOUCH   // Only debugging
 FT6X36 ts(CONFIG_TOUCH_INT);
 EpdSpi io;
-Gdey0154d67 display(io);
+Gdey027T91 display(io);
 
 // 1||3 = Landscape  0||2 = Portrait mode. Using 0 usually the bottom is at the side of FPC connector
 uint8_t display_rotation = 1;
@@ -328,14 +328,14 @@ void getClock() {
     x_cursor = 10;
   }
 
-  draw_centered_text(&Ubuntu_L7pt8b,x_cursor+10,20,display.width(),12,"%03d:%02d:%02d ON", hr, m, s);
+  draw_centered_text(&Ubuntu_L7pt8b,1,1,display.width(),18,"%03d:%02d:%02d ON", hr, m, s);
 }
 
 void drawUX(int tx, int ty) {
   getClock();
-  display.setCursor(10, 20);
-  display.printerf("x:%d y:%d", tx, ty);
-
+  if (tx != 0 && ty != 0) {
+    draw_centered_text(&Ubuntu_L7pt8b, 1, 20, display.width(), 18, "x:%d y:%d", tx, ty);
+  }
   uint16_t dw = display.width();
   uint16_t dh = display.height();
   uint8_t  sw = 20;
@@ -422,12 +422,11 @@ void app_main(void)
     printf("NVS opened\n");
   }
 
-  gpio_pullup_en(RTC_INT);
   gpio_set_direction(RTC_INT, GPIO_MODE_INPUT);
-  ESP_LOGI("RTC INT", "when IO %d is Low", (int)RTC_INT);
+  gpio_pullup_en(RTC_INT);
   // Setup interrupt for this IO that goes low on the interrupt
   gpio_set_intr_type(RTC_INT, GPIO_INTR_NEGEDGE);
-
+  ESP_LOGI("RTC INT", "when IO %d is Low", (int)RTC_INT);
 
   //Initialize GPIOs direction & initial states
   gpio_set_direction((gpio_num_t)GPIO_RELAY_ON, GPIO_MODE_OUTPUT);
@@ -451,6 +450,7 @@ void app_main(void)
   display.setRotation(display_rotation);
   display.setFont(&Ubuntu_L7pt8b);
   display.setTextColor(EPD_BLACK);
+  printf("DISPLAY width() %d height() %d\n", display.width(), display.height());
 
 // Initialize RTC
   if (pcf8563_init_desc(&dev, I2C_NUM_0, (gpio_num_t) CONFIG_SDA_GPIO, (gpio_num_t)CONFIG_SCL_GPIO) != ESP_OK) {
@@ -476,14 +476,12 @@ void app_main(void)
      display.update();
      setClock();
   #endif
-  
-  printf("bef settimer RTC int state: %d (Should be 1 at start)\n\n", gpio_get_level(RTC_INT));
+
   // Every second         1 sec= 1 HZ , divider (If it would be two then will tick 2x per second)
   pcf8563_set_timer(&dev, PCF8563_CLK_1HZ, 1);
   pcf8563_enable_timer(&dev);
   pcf8563_get_flags(&dev);
-  printf("after RTC int state: %d (Should be 1 at start)\n\n", gpio_get_level(RTC_INT));
-
+  printf("After RTC int state: %d (Should be 1 at start, if not check pullup in %d GPIO)\n\n", RTC_INT, gpio_get_level(RTC_INT));
 
   // PCF Minute alarm: Still need to find out how to correctly set it and extend my class
   gpio_install_isr_service(0); // Is already used by touch!
