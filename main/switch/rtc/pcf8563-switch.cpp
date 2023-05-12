@@ -481,7 +481,7 @@ void app_main(void)
   pcf8563_set_timer(&dev, PCF8563_CLK_1HZ, 1);
   pcf8563_enable_timer(&dev);
   pcf8563_get_flags(&dev);
-  printf("After RTC int state: %d (Should be 1 at start, if not check pullup in %d GPIO)\n\n", RTC_INT, gpio_get_level(RTC_INT));
+  printf("After RTC int state: %d (Should be 1 at start, if not check pullup in IO%d)\n\n", gpio_get_level(RTC_INT), (int)RTC_INT);
 
   // PCF Minute alarm: Still need to find out how to correctly set it and extend my class
   gpio_install_isr_service(0); // Is already used by touch!
