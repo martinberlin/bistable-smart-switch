@@ -45,13 +45,11 @@ menu "RTC & I2C Configuration"
                 Get the time difference of NTP and RTC.
     endchoice
 
-if SET_CLOCK || DIFF_CLOCK
     config NTP_SERVER
         string "NTP Server"
         default "pool.ntp.org"
         help
             Hostname for NTP Server.
-endif
 
 endmenu
 
