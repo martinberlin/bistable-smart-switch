@@ -9,6 +9,7 @@
 #include "driver/gpio.h"
 // I2C RTC
 #include "pcf8563.h"
+#define CONFIG_NTP_SERVER "pool.ntp.org"
 // I2C Touch
 #include "FT6X36.h"
 // Non-Volatile Storage (NVS)
@@ -24,34 +25,32 @@
 // Translations: select only one
 #include "english.h"
 //#include "gdew027w3.h"
-//#include "goodisplay/gdey0154d67.h"
+//#include "goodisplay/gdey0154d67.h" // Tiny switch test
 #include "goodisplay/gdey027T91.h"
-#include "goodisplay/touch/gdey027T91T.h"
 
 // INTGPIO is touch interrupt, goes low when it detects a touch, which coordinates are read by I2C
-#define DEBUG_COUNT_TOUCH 0  // Only debugging
+// #define DEBUG_COUNT_TOUCH   // Only debugging
 FT6X36 ts(CONFIG_TOUCH_INT);
 EpdSpi io;
-
 Gdey027T91 display(io);
-//Gdey027T91T display(io, ts);
 
 // 1||3 = Landscape  0||2 = Portrait mode. Using 0 usually the bottom is at the side of FPC connector
-uint8_t display_rotation = 0;
+uint8_t display_rotation = 1;
 // Mono mode = true for faster monochrome update. 4 grays is nice but slower
 bool display_mono_mode = true;
-bool display_dark_mode = true;
+
 
 /** DEVICE CONSUMTION CONFIG 
     Please edit this two values to make the switch aware of how much consumes the lamp you are controlling */
 #define DEVICE_CONSUMPTION_WATTS 100
 double  DEVICE_KW_HOUR_COST    = 0.4;  // € or $ in device appears only $ since there is an issue printing Euro sign
 
+
 // Relay Latch (high) / OFF
-#define GPIO_RELAY_ON 1
+#define GPIO_RELAY_ON 2
 #define GPIO_RELAY_OFF 3
 // GPIO_NUM_2 in C3 | GPIO_NUM_1 in watch mini PCB 
-#define RTC_INT GPIO_NUM_1
+#define RTC_INT GPIO_NUM_2
 // Pulse to move the switch in millis
 const uint16_t signal_ms = 50;
 
@@ -81,9 +80,6 @@ bool switch_state = false; // starts false = OFF
 
 int switch_on_sec_count = 0;
 int switch_all_sec_count = 0;
-// Default colors
-uint16_t display_text_color = EPD_BLACK;
-uint16_t display_back_color = EPD_WHITE;
 
 // I2C descriptor
 i2c_dev_t dev;
@@ -187,6 +183,14 @@ void on_Task(void *params)
     }
 }
 
+// Some GFX constants
+uint16_t blockHeight = display.height()/4;
+uint16_t lineSpacing = 18;
+uint16_t circleColor = EPD_BLACK;
+uint16_t circleRadio = 10;
+uint16_t selectTextColor  = EPD_WHITE;
+uint16_t selectBackground = EPD_BLACK;
+
 void draw_centered_text(const GFXfont *font, int16_t x, int16_t y, uint16_t w, uint16_t h, const char* format, ...) {
     // Handle printf arguments
     va_list args;
@@ -203,7 +207,7 @@ void draw_centered_text(const GFXfont *font, int16_t x, int16_t y, uint16_t w, u
     }
     // Draw external boundary where text needs to be centered in the middle
     //printf("drawRect x:%d y:%d w:%d h:%d\n\n", x, y, w, h);
-    display.fillRect(x, y, w, h, display_back_color);
+    display.fillRect(x, y, w, h, EPD_WHITE);
     display.setFont(font);
     int16_t text_x = 0;
     int16_t text_y = 0;
@@ -284,7 +288,7 @@ void setClock()
 }
 
 void getClock() {
-  display.fillScreen(display_back_color); // Clean display
+  display.fillScreen(EPD_WHITE); // Clean display
   // I2CDEV: Could not read from device in the 2x time. TODO: Find why
   // Get RTC date and time
   if (pcf8563_get_time(&dev, &rtcinfo) != ESP_OK) {
@@ -295,7 +299,7 @@ void getClock() {
   ESP_LOGI("CLOCK", "\n%s\n%02d:%02d", weekday_t[rtcinfo.tm_wday], rtcinfo.tm_hour, rtcinfo.tm_min);
 
   // Starting coordinates:
-  uint16_t y_start = display.height()-10;
+  uint16_t y_start = display.height()-20;
   uint16_t x_cursor = 1;
   // For portrait mode update this coordinates
   if (display_rotation == 0 || display_rotation == 2) {
@@ -321,38 +325,35 @@ void getClock() {
   x_cursor = display.width()/2+30;
   if (display_rotation == 0 || display_rotation == 2) {
     y_start = display.height()-20;
-    x_cursor = 1;
+    x_cursor = 10;
   }
 
-  draw_centered_text(&Ubuntu_L7pt8b,1,display.height()-40,display.width(),14,"%03d:%02d:%02d ON", hr, m, s);
+  draw_centered_text(&Ubuntu_L7pt8b,1,1,display.width(),18,"%03d:%02d:%02d ON", hr, m, s);
 }
 
-void drawUX(uint16_t tx, uint16_t ty) {
+void drawUX(int tx, int ty) {
   getClock();
-  if (tx != 0 && ty != 0) { 
-    display.setCursor(10, 40);
-    //display.setFont(&Ubuntu_M16pt8b);
-    display.printerf("x:%d y:%d", tx, ty);
+  if (tx != 0 && ty != 0) {
+    draw_centered_text(&Ubuntu_L7pt8b, 1, 20, display.width(), 18, "x:%d y:%d", tx, ty);
   }
-
   uint16_t dw = display.width();
   uint16_t dh = display.height();
   uint8_t  sw = 20;
   uint8_t  sh = 50;
   uint8_t  keyw = 16;
   uint8_t  keyh = 16;
-  display.fillRoundRect(dw/2-sw/2, dh/2-sh/2, sw, sh, 4, display_back_color);
-  display.drawRoundRect(dw/2-sw/2, dh/2-sh/2, sw, sh, 4, display_text_color);
+  display.fillRoundRect(dw/2-sw/2, dh/2-sh/2, sw, sh, 4, EPD_WHITE);
+  display.drawRoundRect(dw/2-sw/2, dh/2-sh/2, sw, sh, 4, EPD_BLACK);
 
   // OFF position
   if (!switch_state) {
-    display.fillRoundRect(dw/2-keyw/2, dh/2, keyw, keyh, 5, display_text_color);
+    display.fillRoundRect(dw/2-keyw/2, dh/2, keyw, keyh, 5, EPD_BLACK);
     gpio_set_level((gpio_num_t)GPIO_RELAY_OFF, 1); // OFF
     delay(signal_ms);
     gpio_set_level((gpio_num_t)GPIO_RELAY_OFF, 0); // OFF release
     printf("Draw OFF\n\n");
   } else {
-    display.fillRoundRect(dw/2-keyw/2, dh/2-keyh, keyw, keyh, 5, display_text_color);
+    display.fillRoundRect(dw/2-keyw/2, dh/2-keyh, keyw, keyh, 5, EPD_BLACK);
     gpio_set_level((gpio_num_t)GPIO_RELAY_ON, 1); // ON
     delay(signal_ms);
     gpio_set_level((gpio_num_t)GPIO_RELAY_ON, 0); // ON release
@@ -373,16 +374,15 @@ void touchEvent(TPoint p, TEvent e)
 {
   #if defined(DEBUG_COUNT_TOUCH) && DEBUG_COUNT_TOUCH==1
     ++t_counter;
-    printf("e %x %d  ",(int)e,t_counter); // Working
+    printf("e %x %d  ",e,t_counter); // Working
   #endif
 
-  // Only if Interrupt is in 0x01 trigger mode
-  if (e != TEvent::Tap) return;
+  if (e != TEvent::Tap && e != TEvent::DragStart && e != TEvent::DragMove && e != TEvent::DragEnd)
+    return;
 
   switch_state = !switch_state;
   
   drawUX(p.x,p.y);
-  //ts.powerMode(0x01);
 }
 
 // Generic function to read NVS values and leave feedback
@@ -402,10 +402,7 @@ void err_announcer(esp_err_t err, char * name, int value) {
 void app_main(void)
 {
   printf("CalEPD version: %s\nLast reset reason:%d\n", CALEPD_VERSION, esp_reset_reason());
-  if (display_dark_mode) {
-    display_text_color = EPD_WHITE;
-    display_back_color = EPD_BLACK;
-  }
+
   // Initialize NVS
   esp_err_t err = nvs_flash_init();
   if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -425,11 +422,11 @@ void app_main(void)
     printf("NVS opened\n");
   }
 
-  gpio_pullup_en(RTC_INT);
   gpio_set_direction(RTC_INT, GPIO_MODE_INPUT);
-  ESP_LOGI("RTC INT", "when IO %d is Low", (int)RTC_INT);
+  gpio_pullup_en(RTC_INT);
   // Setup interrupt for this IO that goes low on the interrupt
   gpio_set_intr_type(RTC_INT, GPIO_INTR_NEGEDGE);
+  ESP_LOGI("RTC INT", "when IO %d is Low", (int)RTC_INT);
 
   //Initialize GPIOs direction & initial states
   gpio_set_direction((gpio_num_t)GPIO_RELAY_ON, GPIO_MODE_OUTPUT);
@@ -451,11 +448,9 @@ void app_main(void)
    */
   display.setMonoMode(display_mono_mode); // 4 gray: false
   display.setRotation(display_rotation);
-  // Use display Rotation when touch integrated in class
-  //display.displayRotation(display_rotation);
   display.setFont(&Ubuntu_L7pt8b);
-  display.setTextColor(display_text_color);
-  printf("display background color:%x\n\n", display_back_color);
+  display.setTextColor(EPD_BLACK);
+  printf("DISPLAY width() %d height() %d\n", display.width(), display.height());
 
 // Initialize RTC
   if (pcf8563_init_desc(&dev, I2C_NUM_0, (gpio_num_t) CONFIG_SDA_GPIO, (gpio_num_t)CONFIG_SCL_GPIO) != ESP_OK) {
@@ -472,24 +467,21 @@ void app_main(void)
   printf("pcf8563 TIME: %02d:%02d %02d/%02d/%d\n\n", rtcinfo.tm_hour, rtcinfo.tm_min,
                                   rtcinfo.tm_mday, rtcinfo.tm_mon+1, rtcinfo.tm_year);
   
-  // If this values are matched then RTC clock needs to get time from NTP
-  if (rtcinfo.tm_year> 2100 || rtcinfo.tm_mday == 0) {
+  #ifdef CONFIG_SET_CLOCK
      printf("Y:%d m:%d -> Calling NTP internet sync\n\n", rtcinfo.tm_year, rtcinfo.tm_mon);
      display.setCursor(10,10);
-     display.print("RTC second alarm not set");
+     display.print("RTC time & second alarm not set");
      display.setCursor(10,40);
-     display.print("Connecting NTP time sync");
+     display.print("Connecting to do NTP time sync");
      display.update();
      setClock();
-  }
-  
-  printf("bef settimer RTC int state: %d (Should be 1 at start)\n\n", gpio_get_level(RTC_INT));
+  #endif
+
   // Every second         1 sec= 1 HZ , divider (If it would be two then will tick 2x per second)
   pcf8563_set_timer(&dev, PCF8563_CLK_1HZ, 1);
   pcf8563_enable_timer(&dev);
   pcf8563_get_flags(&dev);
-  printf("after RTC int state: %d (Should be 1 at start)\n\n", gpio_get_level(RTC_INT));
-
+  printf("After RTC int state: %d (Should be 1 at start, if not check pullup in %d GPIO)\n\n", RTC_INT, gpio_get_level(RTC_INT));
 
   // PCF Minute alarm: Still need to find out how to correctly set it and extend my class
   gpio_install_isr_service(0); // Is already used by touch!
@@ -498,17 +490,13 @@ void app_main(void)
   on_min_counter_queue = xQueueCreate(10, sizeof(int));
   xTaskCreate(on_Task, "on-counter", 2048, NULL, 1, NULL);
 
-  // Only if display does not integrate touch
   ts.begin(FT6X36_DEFAULT_THRESHOLD, display.width(), display.height());
   ts.setRotation(display.getRotation());
   ts.registerTouchHandler(touchEvent);
-  //display.registerTouchHandler(touchEvent);
-  
   
   drawUX(0,0);
-  // Touch loop. If you find a smarter way to do this please make a Merge request ( github.com/martinberlin/FT6X36-IDF )
+  // Touch loop. If youu find a smarter way to do this please make a Merge request ( github.com/martinberlin/FT6X36-IDF )
   while (true) {
     ts.loop();
-    //display.touchLoop();
   }
 }

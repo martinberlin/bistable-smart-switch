@@ -351,6 +351,7 @@ CONFIG_TIMEZONE=2
 # CONFIG_SET_CLOCK is not set
 CONFIG_GET_CLOCK=y
 # CONFIG_DIFF_CLOCK is not set
+CONFIG_NTP_SERVER="pool.ntp.org"
 # end of RTC & I2C Configuration
 
 #
