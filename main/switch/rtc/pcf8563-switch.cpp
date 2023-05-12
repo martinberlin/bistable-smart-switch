@@ -24,17 +24,20 @@
 // Translations: select only one
 #include "english.h"
 //#include "gdew027w3.h"
+//#include "goodisplay/gdey0154d67.h"
 #include "goodisplay/gdey027T91.h"
-#include "goodisplay/gdey029T94.h"
+#include "goodisplay/touch/gdey027T91T.h"
 
 // INTGPIO is touch interrupt, goes low when it detects a touch, which coordinates are read by I2C
-// #define DEBUG_COUNT_TOUCH   // Only debugging
+#define DEBUG_COUNT_TOUCH 0  // Only debugging
 FT6X36 ts(CONFIG_TOUCH_INT);
 EpdSpi io;
+
 Gdey027T91 display(io);
+//Gdey027T91T display(io, ts);
 
 // 1||3 = Landscape  0||2 = Portrait mode. Using 0 usually the bottom is at the side of FPC connector
-uint8_t display_rotation = 2;
+uint8_t display_rotation = 0;
 // Mono mode = true for faster monochrome update. 4 grays is nice but slower
 bool display_mono_mode = true;
 bool display_dark_mode = true;
@@ -47,8 +50,8 @@ double  DEVICE_KW_HOUR_COST    = 0.4;  // € or $ in device appears only $ sinc
 // Relay Latch (high) / OFF
 #define GPIO_RELAY_ON 1
 #define GPIO_RELAY_OFF 3
-// GPIO_NUM_2 in C3
-#define RTC_INT GPIO_NUM_2
+// GPIO_NUM_2 in C3 | GPIO_NUM_1 in watch mini PCB 
+#define RTC_INT GPIO_NUM_1
 // Pulse to move the switch in millis
 const uint16_t signal_ms = 50;
 
@@ -321,11 +324,17 @@ void getClock() {
     x_cursor = 1;
   }
 
-  draw_centered_text(&Ubuntu_L7pt8b,x_cursor,y_start,display.width(),12,"%03d:%02d:%02d ON", hr, m, s);
+  draw_centered_text(&Ubuntu_L7pt8b,1,display.height()-40,display.width(),14,"%03d:%02d:%02d ON", hr, m, s);
 }
 
-void drawUX() {
+void drawUX(uint16_t tx, uint16_t ty) {
   getClock();
+  if (tx != 0 && ty != 0) { 
+    display.setCursor(10, 40);
+    //display.setFont(&Ubuntu_M16pt8b);
+    display.printerf("x:%d y:%d", tx, ty);
+  }
+
   uint16_t dw = display.width();
   uint16_t dh = display.height();
   uint8_t  sw = 20;
@@ -353,7 +362,7 @@ void drawUX() {
   char * label = (switch_state) ? (char *)"ON" : (char *)"OFF";
   draw_centered_text(&Ubuntu_L7pt8b, dw/2-22, dh/2-sh, 40, 20, label);
 
-  
+  display.update();
   // It does not work correctly with partial update leaves last position gray
   //display.updateWindow(dw/2-40, dh/2-keyh-40, 100, 86);
 }
@@ -364,16 +373,16 @@ void touchEvent(TPoint p, TEvent e)
 {
   #if defined(DEBUG_COUNT_TOUCH) && DEBUG_COUNT_TOUCH==1
     ++t_counter;
-    printf("e %x %d  ",e,t_counter); // Working
+    printf("e %x %d  ",(int)e,t_counter); // Working
   #endif
 
-  if (e != TEvent::Tap)
-    return;
+  // Only if Interrupt is in 0x01 trigger mode
+  if (e != TEvent::Tap) return;
 
   switch_state = !switch_state;
-  drawUX();
-  draw_centered_text(&Ubuntu_L7pt8b,1,display.height()-40,display.width(),12,"x:%d y:%d", p.x , p.y);
-  display.update();
+  
+  drawUX(p.x,p.y);
+  //ts.powerMode(0x01);
 }
 
 // Generic function to read NVS values and leave feedback
@@ -442,6 +451,8 @@ void app_main(void)
    */
   display.setMonoMode(display_mono_mode); // 4 gray: false
   display.setRotation(display_rotation);
+  // Use display Rotation when touch integrated in class
+  //display.displayRotation(display_rotation);
   display.setFont(&Ubuntu_L7pt8b);
   display.setTextColor(display_text_color);
   printf("display background color:%x\n\n", display_back_color);
@@ -487,14 +498,17 @@ void app_main(void)
   on_min_counter_queue = xQueueCreate(10, sizeof(int));
   xTaskCreate(on_Task, "on-counter", 2048, NULL, 1, NULL);
 
+  // Only if display does not integrate touch
   ts.begin(FT6X36_DEFAULT_THRESHOLD, display.width(), display.height());
   ts.setRotation(display.getRotation());
   ts.registerTouchHandler(touchEvent);
+  //display.registerTouchHandler(touchEvent);
   
-  drawUX();
-  display.update();
+  
+  drawUX(0,0);
   // Touch loop. If you find a smarter way to do this please make a Merge request ( github.com/martinberlin/FT6X36-IDF )
   while (true) {
     ts.loop();
+    //display.touchLoop();
   }
 }

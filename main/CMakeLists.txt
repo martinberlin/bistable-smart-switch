@@ -12,12 +12,14 @@ message(STATUS "→ Building example for ${target}")
 
 # 3. Add DS3231 RTC to the Firmware
 #set(app_sources "switch/rtc/ds3231-switch.cpp")
-#set(app_sources "switch/rtc/pcf8563-switch.cpp")
-set(app_sources "buttons/6-button-actions.cpp")
+set(app_sources "switch/rtc/pcf8563-switch.cpp")
+#set(app_sources "buttons/6-button-actions.cpp")
 # Only set-clock example: 
 #set(app_sources "switch/rtc/ds3231-set-rtc-clock.cpp")
 # Single Epaper tests
 #set(app_sources "tests/epd-27t91-test.cpp")
+# Deep-sleep consumption test
+#set(app_sources "tests/deeepsleep.cpp")
 
 set(app_requires
         # I2C peripherals: Touch FT6X36 and RTC
